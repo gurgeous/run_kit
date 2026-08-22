@@ -1,0 +1,7 @@
+require_relative "options/color"
+require_relative "options/config"
+require_relative "options/flag"
+require_relative "options/help"
+require_relative "options/main"
+require_relative "options/parser"
+require_relative "options/positional"

@@ -1,0 +1,10 @@
+[env]
+_.path = ['{{config_root}}/bin']
+
+[hooks]
+postinstall = ["bundle install"]
+
+[tools]
+just = "latest"
+prek = "latest"
+ruby = "latest"

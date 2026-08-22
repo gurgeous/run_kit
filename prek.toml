@@ -1,0 +1,46 @@
+#
+# args: [--severity=error]
+#
+# prek install
+# prek run
+# prek run --all-files
+#
+
+[[repos]]
+repo = "https://github.com/pre-commit/pre-commit-hooks"
+rev = "v6.0.0"
+hooks = [
+  { id = "check-added-large-files" },              # reject large files from git
+  { id = "check-case-conflict" },                  # detect filename case collisions
+  { id = "check-executables-have-shebangs" },      # verify shebangs for shell scripts
+  { id = "check-json" },                           # validate json files
+  { id = "check-merge-conflict" },                 # detect merge markers
+  { id = "check-shebang-scripts-are-executable" }, # verify shell script perms
+  { id = "check-symlinks" },                       # detect broken symlinks
+  { id = "check-toml" },                           # validate toml files
+  { id = "check-yaml" },                           # validate yaml file
+  { id = "detect-private-key" },                   # reject private keys
+  { id = "end-of-file-fixer" },                    # ensure final newline
+  { id = "mixed-line-ending" },                    # normalize line endings
+  { id = "trailing-whitespace" },                  # remove trailing whitespace
+]
+
+[[repos]]
+repo = "https://github.com/rhysd/actionlint"
+rev = "v1.7.12"
+hooks = [ { id = "actionlint" } ] # lint github actions
+
+[[repos]]
+repo = "https://github.com/Yelp/detect-secrets"
+rev = "v1.5.0"
+hooks = [ { id = "detect-secrets" } ] # detect committed secrets
+
+[[repos]]
+repo = "https://github.com/koalaman/shellcheck-precommit"
+rev = "v0.11.0"
+hooks = [ { id = "shellcheck" } ] # lint shell scripts
+
+[[repos]]
+repo = "https://github.com/zizmorcore/zizmor-pre-commit"
+rev = "v1.28.0"
+hooks = [ { id = "zizmor" } ] # github actions security

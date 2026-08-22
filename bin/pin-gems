@@ -1,0 +1,28 @@
+#!/usr/bin/env ruby
+
+require "bundler"
+
+Dir.chdir(File.expand_path("..", __dir__))
+
+lock = Bundler::LockfileParser.new(Bundler.read_file("Gemfile.lock"))
+versions = lock.specs.to_h { [_1.name, _1.version] }
+
+# Gather direct RubyGems dependencies from both dependency files.
+dependencies = Bundler.definition.dependencies.filter_map do |dependency|
+  next if dependency.source && !dependency.source.is_a?(Bundler::Source::Rubygems)
+
+  ["Gemfile", dependency]
+end
+
+Dir["*.gemspec"].each do |path|
+  dependencies.concat(Gem::Specification.load(path).dependencies.map { [path, _1] })
+end
+
+# Suggest constraints that permit updates within the locked major version.
+suggestions = dependencies.filter_map do |path, dependency|
+  version = versions.fetch(dependency.name)
+  requirement = "~> #{version.segments.first(2).join(".")}"
+  "#{path}: #{dependency.name} #{dependency.requirement} -> #{requirement}" unless dependency.requirement.to_s == requirement
+end
+
+puts suggestions.empty? ? "No changes suggested." : suggestions
