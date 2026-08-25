@@ -7,4 +7,5 @@ postinstall = ["bundle install"]
 [tools]
 just = "latest"
 prek = "latest"
+python = "latest"
 ruby = "latest"
