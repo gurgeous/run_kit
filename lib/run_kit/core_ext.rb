@@ -35,7 +35,7 @@ module RunKit
     module Enumerator
       def with_progressbar(options = {}, &block)
         defaults = {
-          format: "%j%% %B #{RunKit::Term.paint_ansi("%c/%u %e", RunKit::Term.ansi256_fg(242))}",
+          format: "%t: %j%% %B #{RunKit::Term.paint_ansi("%c/%u %e", RunKit::Term.ansi256_fg(242))}",
           progress_mark: RunKit::Term.paint_ansi("━", RunKit::Term.ansi256_fg(46)),
           remainder_mark: RunKit::Term.paint_ansi("━", RunKit::Term.ansi256_fg(237)),
           output: $stdout.isatty ? $stdout : $stderr,

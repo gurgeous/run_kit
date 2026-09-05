@@ -102,6 +102,10 @@ Note: There has been some effort to get the Pathname helpers into Ruby itself, w
 
 ### Changelog
 
-#### 0.1.0 (unreleased)
+#### 0.1.1 Sep 2026
+
+- add title to progressbar default
+
+#### 0.1.0
 
 - first

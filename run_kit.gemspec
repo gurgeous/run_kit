@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name = "run_kit"
-  s.version = "0.1.0"
+  s.version = "0.1.1"
   s.authors = ["Adam Doppelt"]
   s.email = "amd@gurge.com"
   s.summary = "Run kit."
