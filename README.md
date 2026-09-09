@@ -111,7 +111,7 @@ Note: There has been some effort to get the Pathname helpers into Ruby itself, w
 
 ### Changelog
 
-#### 0.1.2 (unreleased)
+#### 0.1.2 (Sep 2026)
 
 - allow options to read from ENV
 
