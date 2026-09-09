@@ -48,6 +48,21 @@ module RunKit
         assert_equal "Custom help\n", Help.new(custom).to_s
       end
 
+      def test_env
+        config = base_config.tap do
+          _1.bool("--force", "Overwrite", env: true)
+          _1.str("--token", env: "API_TOKEN")
+        end.tap(&:prepare!)
+
+        exp = <<~TEXT
+          Usage: run-kit [options]
+            --force        Overwrite [env: FORCE]
+            --token <str>  [env: API_TOKEN]
+            -h, --help     Show this message
+        TEXT
+        assert_equal exp, Help.new(config).to_s
+      end
+
       def test_wrap
         config = base_config.tap do
           _1.str("--long", "one two three four five six seven eight nine ten")

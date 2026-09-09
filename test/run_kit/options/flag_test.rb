@@ -17,6 +17,7 @@ module RunKit
         assert_equal "Request mode", flag.help
         assert_equal :fast, flag.default
         assert_equal %i[fast safe], flag.choices
+        assert_equal nil, flag.env
         assert_false flag.required?
         assert_equal :http_mode, flag.key
         assert_equal :safe, flag.parse("--http-mode", "safe")
@@ -24,6 +25,38 @@ module RunKit
         flag = Flag.new(:bool, ["-v", "--verbose", "Verbose output"])
         assert_equal false, flag.default
         assert_equal true, flag.parse("--verbose", nil)
+      end
+
+      def test_env
+        flag = Flag.new(:str, ["--http-mode"], env: true)
+        assert_equal "HTTP_MODE", flag.env
+
+        [
+          [%w[1 TRUE Yes on], true],
+          [[""], false],
+          [%w[0 FALSE No off], false],
+        ].each do |values, exp|
+          values.each do |param|
+            assert_equal exp, Flag.new(:bool, ["--value"], env: "VALUE").parse_env(param), param
+          end
+        end
+
+        [
+          [Flag.new(:float, ["--value"], env: "VALUE"), "1.5", 1.5],
+          [Flag.new(:int, ["--value"], env: "VALUE"), "-2", -2],
+          [Flag.new(:path, ["--value"], env: "VALUE"), "tmp/out", Pathname("tmp/out")],
+          [Flag.new(:str, ["--value"], env: "VALUE"), "Lee", "Lee"],
+          [Flag.new(:sym, ["--value"], choices: %i[fast slow], env: "VALUE"), "fast", :fast],
+        ].each do |env_flag, param, exp|
+          assert_equal exp, env_flag.parse_env(param), [env_flag.kind, param].inspect
+        end
+
+        error = assert_raises(Error) { Flag.new(:bool, ["--force"], env: true).parse_env("maybe") }
+        assert_equal "invalid value 'maybe' for environment variable 'FORCE'", error.message
+        assert_raises(Error) { Flag.new(:int, ["--count"], env: true).parse_env("many") }
+        assert_raises(Error) do
+          Flag.new(:sym, ["--mode"], choices: %i[fast slow], env: true).parse_env("other")
+        end
       end
 
       def test_good
@@ -63,6 +96,7 @@ module RunKit
           ["choices type", -> { Flag.new(:str, ["--name"], choices: "Lee") }],
           ["choices empty", -> { Flag.new(:str, ["--name"], choices: []) }],
           ["choice type", -> { Flag.new(:sym, ["--mode"], choices: ["fast"]) }],
+          ["env type", -> { Flag.new(:str, ["--name"], env: false) }],
         ].each do |msg, action|
           assert_raises(ArgumentError, msg, &action)
         end

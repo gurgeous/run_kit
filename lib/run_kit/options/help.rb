@@ -36,10 +36,15 @@ module RunKit
           buf << label
 
           # right
-          if flag.help
+          help = flag.help
+          if flag.env
+            env_help = "[env: #{flag.env}]"
+            help = help ? "#{help} #{env_help}" : env_help
+          end
+          if help
             buf << " " * (label_width - Term.width(label) + 2)
             indent = INDENT + label_width + 2
-            buf << Term.wrap(flag.help, width - indent).gsub("\n", "\n#{" " * indent}")
+            buf << Term.wrap(help, width - indent).gsub("\n", "\n#{" " * indent}")
           end
           buf << "\n"
         end

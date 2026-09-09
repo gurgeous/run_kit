@@ -37,28 +37,28 @@ module RunKit
       # flags
       #
 
-      def bool(*opts, default: nil, required: false)
-        add_flag(Flag.new(:bool, opts, default:, required:))
+      def bool(*opts, default: nil, required: false, env: nil)
+        add_flag(Flag.new(:bool, opts, default:, required:, env:))
       end
 
-      def float(*opts, default: nil, required: false, choices: nil)
-        add_flag(Flag.new(:float, opts, default:, required:, choices:))
+      def float(*opts, default: nil, required: false, choices: nil, env: nil)
+        add_flag(Flag.new(:float, opts, default:, required:, choices:, env:))
       end
 
-      def int(*opts, default: nil, required: false, choices: nil)
-        add_flag(Flag.new(:int, opts, default:, required:, choices:))
+      def int(*opts, default: nil, required: false, choices: nil, env: nil)
+        add_flag(Flag.new(:int, opts, default:, required:, choices:, env:))
       end
 
-      def path(*opts, default: nil, required: false, choices: nil)
-        add_flag(Flag.new(:path, opts, default:, required:, choices:))
+      def path(*opts, default: nil, required: false, choices: nil, env: nil)
+        add_flag(Flag.new(:path, opts, default:, required:, choices:, env:))
       end
 
-      def str(*opts, default: nil, required: false, choices: nil)
-        add_flag(Flag.new(:str, opts, default:, required:, choices:))
+      def str(*opts, default: nil, required: false, choices: nil, env: nil)
+        add_flag(Flag.new(:str, opts, default:, required:, choices:, env:))
       end
 
-      def sym(*opts, default: nil, required: false, choices: nil)
-        add_flag(Flag.new(:sym, opts, default:, required:, choices:))
+      def sym(*opts, default: nil, required: false, choices: nil, env: nil)
+        add_flag(Flag.new(:sym, opts, default:, required:, choices:, env:))
       end
 
       # long-form aliases
