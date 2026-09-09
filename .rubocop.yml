@@ -35,7 +35,6 @@ Naming/MemoizedInstanceVariableName: { Enabled: true } # clean memo ivars
 Naming/MethodName: { Enabled: true } # keep method names conventional
 Performance/MapCompact: { Enabled: true } # filter_map-ish style
 Performance/RegexpMatch: { Enabled: false } # local style is fine
-Performance/SelectMap: { Enabled: true } # filter_map-ish style
 Style/BlockDelimiters: { Enabled: true } # do/end vs braces
 Style/ClassAndModuleChildren: { Enabled: true, EnforcedStyle: nested } # explicit nesting
 Style/ClassMethodsDefinitions: { Enabled: true } # avoid "class << self"

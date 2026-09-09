@@ -96,13 +96,17 @@ module RunKit
         })
 
         config = Config.new.tap do
+          _1.version = "1.2.3"
           _1.bool("--force", env: "RUN_KIT_TEST_FORCE")
           _1.float("--ratio", env: "RUN_KIT_TEST_RATIO")
           _1.int("--count", default: 1, env: "RUN_KIT_TEST_COUNT")
           _1.path("--output", env: "RUN_KIT_TEST_OUTPUT")
           _1.str("--name", required: true, env: "RUN_KIT_TEST_NAME")
           _1.sym("--mode", choices: %i[fast slow], env: "RUN_KIT_TEST_MODE")
-        end
+        end.tap(&:prepare!)
+
+        assert_raises(NakedRequested) { Parser.new(config).parse([]) }
+        config.naked = false
 
         assert_equal({
           force: true,
@@ -115,6 +119,12 @@ module RunKit
           force?: true,
         }, Parser.new(config).parse([]))
 
+        ENV["RUN_KIT_TEST_COUNT"] = "many"
+        assert_raises(HelpRequested) { Parser.new(config).parse(["--help"]) }
+        assert_raises(VersionRequested) { Parser.new(config).parse(["--version"]) }
+        assert_raises(Error) { Parser.new(config).parse(["--count", "3"]) }
+
+        ENV["RUN_KIT_TEST_COUNT"] = "2"
         options = Parser.new(config).parse(["--no-force", "--count", "3"])
         assert_equal false, options[:force]
         assert_equal false, options[:force?]
