@@ -6,7 +6,7 @@
 module RunKit
   module Options
     class Parser
-      attr_reader :config, :options, :queue
+      attr_reader :config
 
       def initialize(config)
         @config = config
@@ -14,24 +14,23 @@ module RunKit
 
       # Reset transient state, parse argv, and assemble the result.
       def parse(argv)
-        # we begin by parsing argv
-        @options, @queue = {}, argv.dup
-        parse_queue
-
-        # check for naked
+        # 1. naked?
         raise NakedRequested if config.naked? && argv.empty?
 
-        # now fix in ENV, then defaults
-        parse_env
-        config.defaults.each do |key, value|
-          options[key] = value unless options.key?(key)
-        end
+        # 2. Parse argv. We do this first, because other things can raise and
+        # --help should trump other issues.
+        argv_options = parse_argv(argv)
 
-        # add predicate? values
-        config.flags.filter_map { _1.key if _1.bool? }.each do
+        # 3. defaults => ENV => ARGV
+        options = {}.merge(config.defaults, parse_env, argv_options)
+
+        # 4. validate final options
+        validate!(options)
+
+        # success! add predicate? keys
+        config.flags.select(&:bool?).map(&:key).each do
           options[:"#{_1}?"] = options[_1] if options.key?(_1)
         end
-        validate!
 
         options
       end
@@ -42,35 +41,36 @@ module RunKit
       # main parser
       #
 
-      def parse_queue
-        # any non-flags we find below
-        operands = []
+      def parse_argv(argv)
+        {}.tap do |result|
+          # any non-flags we find below
+          operands = []
 
-        # process argv as queue
-        while (item = queue.shift)
-          case item
-          when Flag::SWITCH_RE, Flag::INLINE_RE then parse_switch(item, Regexp.last_match)
-          when /\A-[^-]/ then parse_smashed(item)
-          when "", /\A[^-]/ then operands << item
-          when "--" then break operands.concat(queue)
-          else; raise Error, "unexpected argument '#{item}' found"
+          # process argv as queue
+          queue = argv.dup
+          while (item = queue.shift)
+            case item
+            when Flag::SWITCH_RE, Flag::INLINE_RE then result.merge!(parse_switch(item, Regexp.last_match, queue))
+            when /\A-[^-]/ then result.merge!(parse_smashed(item, queue))
+            when "", /\A[^-]/ then operands << item
+            when "--" then break operands.concat(queue)
+            else; raise Error, "unexpected argument '#{item}' found"
+            end
           end
-        end
 
-        # positionals
-        config.positionals.each do
-          options[_1.key] = operands.shift
-        end
+          # positionals
+          config.positionals.each { result[_1.key] = operands.shift }
 
-        # _args
-        options[:_args] = operands
+          # _args
+          result[:_args] = operands
+        end
       end
 
       #
       # -x or -x=123 or --xyz or --xyz=123 or --no-xyz
       #
 
-      def parse_switch(item, match)
+      def parse_switch(item, match, queue)
         switch = "-#{match[1]}"
         param = match[2]
         separator = param ? "=" : ""
@@ -79,15 +79,13 @@ module RunKit
         if (flag = config.flag(switch))
           builtin!(flag)
           param = queue.shift if flag.takes_param? && separator.empty?
-          options[flag.key] = flag.parse(switch, param)
-          return
+          return {flag.key => flag.parse(switch, param)}
         end
 
         # --no-xyz?
         if (neg = find_negated_flag(switch))
           raise Error, "option '#{item}' does not take a value" if separator == "="
-          options[neg.key] = false
-          return
+          return {neg.key => false}
         end
 
         raise Error, "unexpected argument '#{item}' found"
@@ -99,7 +97,8 @@ module RunKit
 
       # Expand short-switch groups such as `-qv`. A parameter-taking switch ends
       # the group and consumes either its attached suffix or the next queue item.
-      def parse_smashed(group)
+      def parse_smashed(group, queue)
+        result = {}
         (1...group.length).each do |idx|
           switch = "-#{group[idx]}"
           flag = config.flag(switch)
@@ -113,13 +112,14 @@ module RunKit
             else
               queue.shift
             end
-            options[flag.key] = flag.parse(switch, param)
-            return
+            result[flag.key] = flag.parse(switch, param)
+            return result
           end
 
           # bool
-          options[flag.key] = true
+          result[flag.key] = true
         end
+        result
       end
 
       #
@@ -127,12 +127,9 @@ module RunKit
       #
 
       def parse_env
-        config.flags.select(&:env).each do
-          next if options.key?(_1.key)
-          if (value = ENV[_1.env])
-            options[_1.key] = _1.parse_env(value)
-          end
-        end
+        config.flags.select { _1.env && ENV.key?(_1.env) }.map do |flag|
+          [flag.key, flag.parse_env(ENV[flag.env])]
+        end.to_h
       end
 
       #
@@ -151,7 +148,7 @@ module RunKit
         end
       end
 
-      def validate!
+      def validate!(options)
         config.required.each do
           raise Error, "required option '#{_1.switch}' is missing" if !options.key?(_1.key)
         end

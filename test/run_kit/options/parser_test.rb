@@ -122,7 +122,9 @@ module RunKit
         ENV["RUN_KIT_TEST_COUNT"] = "many"
         assert_raises(HelpRequested) { Parser.new(config).parse(["--help"]) }
         assert_raises(VersionRequested) { Parser.new(config).parse(["--version"]) }
+        assert_raises(Error) { Parser.new(config).parse(["--count", "3"]) }
 
+        ENV["RUN_KIT_TEST_COUNT"] = "2"
         options = Parser.new(config).parse(["--no-force", "--count", "3"])
         assert_equal false, options[:force]
         assert_equal false, options[:force?]
