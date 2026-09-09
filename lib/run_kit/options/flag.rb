@@ -12,12 +12,14 @@ module RunKit
       # --no-foo
       NEGATE_RE = /\A--no-(\w[\w-]*)\z/
 
+      TRUE_ENV = %w[1 true yes on]
+      FALSE_ENV = ["", "0", "false", "no", "off"]
       KINDS = %i[bool float int path str sym]
 
-      attr_reader :choices, :default, :help, :kind, :meta, :required, :switches
+      attr_reader(*%i[choices default env help kind meta required switches])
 
       # ctor
-      def initialize(kind, opts, default: nil, required: false, choices: nil)
+      def initialize(kind, opts, default: nil, required: false, choices: nil, env: nil)
         @choices, @kind, @required = choices, kind, required
 
         # extract @help from last string
@@ -28,6 +30,7 @@ module RunKit
 
         # Extract meta from the final switch, if written as `--port <int>`.
         @meta = build_meta
+        @env = (env == true) ? key.to_s.upcase : env
 
         # default, with some special handling for bool
         @default = default
@@ -50,22 +53,21 @@ module RunKit
         end
 
         raise Error, "option '#{switch}' requires a value" if !param
-        parsed = begin
-          case kind
-          when :float then Float(param)
-          when :int then Integer(param, 10)
-          when :path then Pathname.new(param)
-          when :str then param
-          when :sym then param.to_sym
-          end
-        rescue ArgumentError
-          raise Error, "invalid value '#{param}' for option '#{switch}'"
+        parse_value(param, "option '#{switch}'")
+      end
+
+      # Parse a value supplied by ENV[$SOMETHING]
+      def parse_env(param)
+        source = "environment variable '#{env}'"
+
+        # special handling for bools
+        if bool?
+          return true if TRUE_ENV.include?(param.downcase)
+          return false if FALSE_ENV.include?(param.downcase)
+          raise Error, "invalid value '#{param}' for #{source}"
         end
 
-        if choices && !choices.include?(parsed)
-          raise Error, "invalid value '#{parsed}' for option '#{switch}', must be one of #{choices.join(", ")}"
-        end
-        parsed
+        parse_value(param, source)
       end
 
       # one-liners
@@ -96,6 +98,7 @@ module RunKit
         raise ArgumentError, "required must be true or false" unless required == true || required == false
         raise ArgumentError, "required flags cannot have defaults" if required && default != nil
         raise ArgumentError, "invalid default #{default.inspect} for #{kind}" if default != nil && !allowed?(default)
+        raise ArgumentError, "env must be true or a string" unless env.nil? || env.is_a?(String)
 
         # choices
         if choices
@@ -129,6 +132,25 @@ module RunKit
         when :str then candidate.is_a?(String)
         when :sym then candidate.is_a?(Symbol)
         end
+      end
+
+      def parse_value(param, source)
+        parsed = begin
+          case kind
+          when :float then Float(param)
+          when :int then Integer(param, 10)
+          when :path then Pathname.new(param)
+          when :str then param
+          when :sym then param.to_sym
+          end
+        rescue ArgumentError
+          raise Error, "invalid value '#{param}' for #{source}"
+        end
+
+        if choices && !choices.include?(parsed)
+          raise Error, "invalid value '#{parsed}' for #{source}, must be one of #{choices.join(", ")}"
+        end
+        parsed
       end
     end
   end

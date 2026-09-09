@@ -80,6 +80,51 @@ module RunKit
         }, options)
       end
 
+      def test_env
+        names = %w[
+          RUN_KIT_TEST_COUNT RUN_KIT_TEST_FORCE RUN_KIT_TEST_MODE
+          RUN_KIT_TEST_NAME RUN_KIT_TEST_OUTPUT RUN_KIT_TEST_RATIO
+        ]
+        previous = names.to_h { [_1, ENV[_1]] }
+        ENV.update({
+          "RUN_KIT_TEST_COUNT" => "2",
+          "RUN_KIT_TEST_FORCE" => "yes",
+          "RUN_KIT_TEST_MODE" => "fast",
+          "RUN_KIT_TEST_NAME" => "Lee",
+          "RUN_KIT_TEST_OUTPUT" => "tmp/out",
+          "RUN_KIT_TEST_RATIO" => "1.5",
+        })
+
+        config = Config.new.tap do
+          _1.bool("--force", env: "RUN_KIT_TEST_FORCE")
+          _1.float("--ratio", env: "RUN_KIT_TEST_RATIO")
+          _1.int("--count", default: 1, env: "RUN_KIT_TEST_COUNT")
+          _1.path("--output", env: "RUN_KIT_TEST_OUTPUT")
+          _1.str("--name", required: true, env: "RUN_KIT_TEST_NAME")
+          _1.sym("--mode", choices: %i[fast slow], env: "RUN_KIT_TEST_MODE")
+        end
+
+        assert_equal({
+          force: true,
+          ratio: 1.5,
+          count: 2,
+          output: Pathname("tmp/out"),
+          name: "Lee",
+          mode: :fast,
+          _args: [],
+          force?: true,
+        }, Parser.new(config).parse([]))
+
+        options = Parser.new(config).parse(["--no-force", "--count", "3"])
+        assert_equal false, options[:force]
+        assert_equal false, options[:force?]
+        assert_equal 3, options[:count]
+      ensure
+        previous&.each do |name, value|
+          value ? ENV[name] = value : ENV.delete(name)
+        end
+      end
+
       def test_errors
         [
           ["unknown", ["--gub"], ->(o) { o.bool("--good") }],

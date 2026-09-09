@@ -14,7 +14,10 @@ module RunKit
 
       # Reset transient state, parse argv, and assemble the result.
       def parse(argv)
-        @options, @queue = config.defaults, argv.dup
+        env = build_env
+        raise NakedRequested if config.naked? && argv.empty? && env.empty?
+
+        @options, @queue = config.defaults.merge(env), argv.dup
         parse_queue
         validate!
         options
@@ -27,8 +30,6 @@ module RunKit
       #
 
       def parse_queue
-        raise NakedRequested if config.naked? && queue.empty?
-
         # any non-flags we find below
         operands = []
 
@@ -116,6 +117,13 @@ module RunKit
       #
       # helpers
       #
+
+      def build_env
+        config.flags.filter_map do
+          next unless _1.env && ENV.key?(_1.env)
+          [_1.key, _1.parse_env(ENV.fetch(_1.env))]
+        end.to_h
+      end
 
       def builtin!(flag)
         raise HelpRequested if flag == config.help_flag

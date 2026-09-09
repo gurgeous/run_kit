@@ -30,6 +30,15 @@ Automatic `--help` for the above. Uses color and wraps to terminal:
 
 <img width="379" height="108" alt="image" src="https://github.com/user-attachments/assets/3d11c8ca-6b57-4dec-9c11-28bf23162ded" />
 
+Flags can also read from ENV:
+
+```ruby
+o.bool "--force", env: true              # ENV["FORCE"]
+o.str "--token", env: "API_TOKEN"        # ENV["API_TOKEN"]
+```
+
+Configured variables appear in `--help`. Command-line values override ENV, which overrides defaults. Boolean ENV values accept `true/1/yes/on` and `false/0/no/off/empty`, ignoring case.
+
 ## RunKit::Shell
 
 `RunKit::Shell` is a mixin with many helpers for bin scripts:
@@ -101,6 +110,10 @@ RunKit also installs a small set of core extensions to assist with bin scripts.
 Note: There has been some effort to get the Pathname helpers into Ruby itself, without much success.
 
 ### Changelog
+
+#### 0.1.2 (unreleased)
+
+- allow options to read from ENV
 
 #### 0.1.1 Sep 2026
 
