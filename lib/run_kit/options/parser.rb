@@ -14,12 +14,25 @@ module RunKit
 
       # Reset transient state, parse argv, and assemble the result.
       def parse(argv)
-        env = build_env
-        raise NakedRequested if config.naked? && argv.empty? && env.empty?
-
-        @options, @queue = config.defaults.merge(env), argv.dup
+        # we begin by parsing argv
+        @options, @queue = {}, argv.dup
         parse_queue
+
+        # check for naked
+        raise NakedRequested if config.naked? && argv.empty?
+
+        # now fix in ENV, then defaults
+        parse_env
+        config.defaults.each do |key, value|
+          options[key] = value unless options.key?(key)
+        end
+
+        # add predicate? values
+        config.flags.filter_map { _1.key if _1.bool? }.each do
+          options[:"#{_1}?"] = options[_1] if options.key?(_1)
+        end
         validate!
+
         options
       end
 
@@ -42,11 +55,6 @@ module RunKit
           when "--" then break operands.concat(queue)
           else; raise Error, "unexpected argument '#{item}' found"
           end
-        end
-
-        # add pred? for bools
-        config.flags.filter_map { _1.key if _1.bool? }.each do
-          options[:"#{_1}?"] = options[_1] if options.key?(_1)
         end
 
         # positionals
@@ -115,15 +123,21 @@ module RunKit
       end
 
       #
-      # helpers
+      # env
       #
 
-      def build_env
-        config.flags.filter_map do
-          next unless _1.env && ENV.key?(_1.env)
-          [_1.key, _1.parse_env(ENV.fetch(_1.env))]
-        end.to_h
+      def parse_env
+        config.flags.select(&:env).each do
+          next if options.key?(_1.key)
+          if (value = ENV[_1.env])
+            options[_1.key] = _1.parse_env(value)
+          end
+        end
       end
+
+      #
+      # helpers
+      #
 
       def builtin!(flag)
         raise HelpRequested if flag == config.help_flag
