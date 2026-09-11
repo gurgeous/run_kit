@@ -111,6 +111,10 @@ Note: There has been some effort to get the Pathname helpers into Ruby itself, w
 
 ### Changelog
 
+#### 0.1.3 (Sep 2026)
+
+- move PROGBAR constant into RunKit::
+
 #### 0.1.2 (Sep 2026)
 
 - allow options to read from ENV

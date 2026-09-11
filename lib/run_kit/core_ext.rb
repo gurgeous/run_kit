@@ -34,20 +34,15 @@ module RunKit
     # each.with_progresbar
     module Enumerator
       def with_progressbar(options = {}, &block)
-        defaults = {
-          format: "%t: %j%% %B #{RunKit::Term.paint_ansi("%c/%u %e", RunKit::Term.ansi256_fg(242))}",
-          progress_mark: RunKit::Term.paint_ansi("━", RunKit::Term.ansi256_fg(46)),
-          remainder_mark: RunKit::Term.paint_ansi("━", RunKit::Term.ansi256_fg(237)),
+        options = RunKit::PROGRESSBAR.merge(
           output: $stdout.isatty ? $stdout : $stderr,
-          total: size,
-          length: 72,
-        }
-        options = defaults.merge(options)
+          total: size
+        ).merge(options)
 
         return enum_for(__method__) if !block
 
-        if !options[:hide]
-          bar = ProgressBar.create(options)
+        bar = if !options[:hide]
+          ProgressBar.create(options)
         end
         RunKit::Term.with_hidden_cursor(options[:output]) do
           each do
