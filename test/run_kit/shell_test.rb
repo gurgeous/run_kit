@@ -33,7 +33,7 @@ module RunKit
     end
 
     def test_json_read
-      path = tmp_path("data.json").tap { _1.write('{"ok":true}') }
+      path = tmp_path("data.json").tap { _1.write("{\n\"ok\":true // inline\n}") }
 
       assert_equal({ok: true}, Shell.json_read(path))
       assert_equal({"ok" => true}, Shell.json_read(path, symbolize_names: false))
@@ -48,7 +48,7 @@ module RunKit
     end
 
     def test_jsonl_read
-      path = tmp_path("data.jsonl").tap { _1.write("{\"ok\":1}\n{\"ok\":2}") }
+      path = tmp_path("data.jsonl").tap { _1.write("{\"ok\":1} // one\n{\"ok\":2} // two") }
 
       assert_equal [{ok: 1}, {ok: 2}], Shell.jsonl_read(path)
       assert_equal [{"ok" => 1}, {"ok" => 2}], Shell.jsonl_read(path, symbolize_names: false)
@@ -304,6 +304,14 @@ module RunKit
       cases.each do |format, value|
         cache.rmtree
         assert_equal value, Shell.cache_fetch(cache:, format:) { value }, "format: #{format}"
+      end
+
+      [
+        [:json, '{"ok":123} // inline', {ok: 123}],
+        [:jsonl, '{"ok":123} // inline', [{ok: 123}]],
+      ].each do |format, contents, exp|
+        cache.write(contents)
+        assert_equal exp, Shell.cache_fetch(cache:, format:), "comments in #{format}"
       end
 
       cache.rmtree

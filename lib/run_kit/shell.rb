@@ -29,9 +29,9 @@ module RunKit
     # json file read/write, including gz
     #
 
-    def json_read(path, symbolize_names: true) = JSON.parse(file_read(path), symbolize_names:)
+    def json_read(path, symbolize_names: true) = JSON.parse(file_read(path), allow_comments: true, symbolize_names:)
     def json_write(path, json) = file_write(path, JSON.pretty_generate(json))
-    def jsonl_read(path, symbolize_names: true) = file_read(path).split("\n").map { JSON.parse(_1, symbolize_names:) }
+    def jsonl_read(path, symbolize_names: true) = file_read(path).split("\n").map { JSON.parse(_1, allow_comments: true, symbolize_names:) }
     def jsonl_write(path, json) = file_write(path, json.map { JSON.generate(_1) }.join("\n"))
 
     #
@@ -262,8 +262,8 @@ module RunKit
       data = gunzip(data) if compress
       case format
       when :bin then data.force_encoding("ascii-8bit")
-      when :json then JSON.parse(data)
-      when :jsonl then data.split("\n").map { JSON.parse(_1) }
+      when :json then JSON.parse(data, allow_comments: true)
+      when :jsonl then data.split("\n").map { JSON.parse(_1, allow_comments: true) }
       when :marshal then Marshal.load(data)
       when :str, :string then data.force_encoding("utf-8")
       else; raise "unknown format #{format.inspect}"
