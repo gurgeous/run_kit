@@ -111,7 +111,7 @@ module RunKit
         assert_equal false, build.color
         assert_equal config.exit, build.exit
         assert_equal "1.2.3", build.version
-        assert_equal "", config.commands[:test].desc
+        assert_nil config.commands[:test].desc
       end
 
       def test_invalid_commands

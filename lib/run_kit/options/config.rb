@@ -27,7 +27,7 @@ module RunKit
       end
 
       # Add a subcommand with its own nested Config, eg `myapp build`.
-      def cmd(name, desc = "")
+      def cmd(name, desc = nil)
         name = name.to_sym
         raise ArgumentError, "duplicate command #{name}" if commands.key?(name)
         Config.new.tap do

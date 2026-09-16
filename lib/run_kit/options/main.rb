@@ -93,7 +93,7 @@ module RunKit
           return exit_fn(1, error: ex.message)
         end
 
-        puts cmd.naked_message
+        puts Help.new(cmd)
         exit_fn(0)
       end
 

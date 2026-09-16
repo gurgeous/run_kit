@@ -19,11 +19,16 @@ module RunKit
       def to_s
         return config.help if config.help
 
-        # usage: xyz (banner)
         buf = StringIO.new
-        buf << banner
-        buf << "\n"
-        buf << "\n" if config.separators.any? { _1.first.zero? }
+
+        # desc
+        buf << desc if config.desc
+
+        # usage: xyz (banner)
+        buf << "\n" << banner << "\n"
+
+        # Options:
+        buf << "\n" << color.blue("Options:") << "\n"
 
         # Render each flag with aligned switch labels and wrapped help text.
         label_width = widest_label
@@ -50,6 +55,7 @@ module RunKit
         end
         buf << separator_text(config.flags.length)
 
+        # Commands:
         buf << commands_section if config.commands.any?
 
         buf.string
@@ -65,6 +71,13 @@ module RunKit
         Term.wrap(text, width)
       end
 
+      # Wrapped desc
+      def desc
+        s = Term.wrap(config.desc, width)
+        s = "#{s}\n"
+        s
+      end
+
       # Render the list of subcommands, aligned like the flag list above.
       def commands_section
         StringIO.new.tap do |buf|
@@ -72,7 +85,7 @@ module RunKit
           label_width = config.commands.keys.map { Term.width(_1.to_s) }.max
           config.commands.each do |name, sub|
             buf << " " * INDENT << color.green(name.to_s)
-            if !sub.desc.empty?
+            if sub.desc
               buf << " " * (label_width - Term.width(name.to_s) + 2)
               indent = INDENT + label_width + 2
               buf << Term.wrap(sub.desc, width - indent).gsub("\n", "\n#{" " * indent}")

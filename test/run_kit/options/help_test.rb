@@ -28,6 +28,20 @@ module RunKit
         assert_equal exp, Help.new(config).to_s
       end
 
+      def test_command_description
+        config = base_config.tap do
+          _1.cmd("build", "Build the project and package all generated files for distribution to users")
+        end.tap(&:prepare!)
+
+        exp = <<~TEXT
+          Usage: run-kit build [options]
+          Build the project and package all generated files for
+          distribution to users
+            -h, --help  Show this message
+        TEXT
+        assert_equal exp, Help.new(config.commands[:build], 60).to_s
+      end
+
       def test_width
         config = Config.new
 

@@ -5,10 +5,17 @@ require_relative "lib/run_kit"
 options = RunKit.parse do |o|
   o.version = "1.0"
   o.bool "--dry-run", "Preview without making changes"
+  o.desc = "this is made up"
 
   o.cmd "fetch", "Fetch a URL" do |c|
     c.int "-n", "--count <n>", "How many times to run", default: 1
     c.str "--mode <mode>", "Run quickly, or not", choices: %w[fast slow]
+
+    c.sep
+    c.sep "Dev options\n"
+    c.int "-d", "How many times to run", default: 1
+    c.str "--dmode <mode>", "Run quickly, or not", choices: %w[fast slow]
+
     c.positional "<url>", "URL to fetch"
   end
 

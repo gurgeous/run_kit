@@ -64,7 +64,8 @@ module RunKit
           end.parse([])
         end
         assert_equal 0, status
-        assert_includes output, "try 'run-kit --help'"
+        assert_includes output, "Usage: run-kit [options]"
+        assert_includes output, "--help"
       end
 
       def test_builtin_scan
@@ -167,12 +168,13 @@ module RunKit
         assert_includes output, "Usage: myapp build"
         assert_includes output, "--target"
 
-        # bare commands show the hint unless naked is disabled
+        # bare commands show full help unless naked is disabled
+        expected_help = output
         output, = capture_io do
           build.call.tap { _1.config.exit = ->(value, *) { status = value } }.parse(["build"])
         end
         assert_equal 0, status
-        assert_equal "myapp build: try 'myapp build --help' for more information\n", output
+        assert_equal expected_help, output
 
         # child version uses settings assigned after command declaration
         output, = capture_io do
