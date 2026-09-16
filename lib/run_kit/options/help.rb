@@ -8,32 +8,37 @@ module RunKit
     class Help
       INDENT = 2
 
-      attr_reader :config, :width
+      attr_reader :config, :root, :width
 
-      def initialize(config, width = nil)
+      def initialize(config, width = nil, root: nil)
         @config = config
+        @root = root unless root == config
         @width = (width || Term.winsize[1]).clamp(60, 100)
       end
 
       # Render generated help, unless the caller supplied complete help text.
       def to_s
         return config.help if config.help
+        help = [].tap do
+          _1 << desc if config.desc
+          _1 << banner
+          _1 << commands_text if config.commands.any?
+          _1 << flags_text(config, "Options:", builtins: !root)
+          _1 << flags_text(root, "Other options:") if root
+        end.compact.join("\n\n")
+        "#{help}\n"
+      end
 
-        buf = StringIO.new
-
-        # desc
-        buf << desc << "\n\n" if config.desc
-
-        # usage: xyz (banner)
-        buf << banner << "\n"
-
-        # Options:
-        buf << "\n" << color.blue("Options:") << "\n"
-
-        # Render each flag with aligned switch labels and wrapped help text.
-        label_width = widest_label
-        config.flags.each.with_index do |flag, idx|
-          buf << separator_text(idx) # sep
+      # Render a heading and aligned flags, preserving explicit separator lines.
+      def flags_text(source, title, builtins: true)
+        flags = source.flags
+        flags -= [source.help_flag, source.version_flag] unless builtins
+        return if flags.empty? && source.separators.empty?
+        lines = [color.blue(title)]
+        label_width = flags.map { Term.width(flag_label(_1)) }.max
+        flags.each.with_index do |flag, idx|
+          lines.concat(separator_lines(source, idx))
+          buf = StringIO.new
 
           # left
           label = flag_label(flag)
@@ -51,14 +56,11 @@ module RunKit
             indent = INDENT + label_width + 2
             buf << Term.wrap(help, width - indent).gsub("\n", "\n#{" " * indent}")
           end
-          buf << "\n"
+          lines << buf.string
         end
-        buf << separator_text(config.flags.length)
+        lines.concat(separator_lines(source, flags.length))
 
-        # Commands:
-        buf << commands_section if config.commands.any?
-
-        buf.string
+        lines.join("\n")
       end
 
       # Build the usage line from the configured app name and positionals.
@@ -72,38 +74,30 @@ module RunKit
       end
 
       # Render the list of subcommands, aligned like the flag list above.
-      def commands_section
-        StringIO.new.tap do |buf|
-          buf << "\n" << color.blue("Commands:") << "\n"
-          label_width = config.commands.keys.map { Term.width(_1.to_s) }.max
-          config.commands.each do |name, sub|
+      def commands_text
+        lines = [color.blue("Commands:")]
+        label_width = config.commands.keys.map { Term.width(_1.to_s) }.max
+        config.commands.each do |name, sub|
+          lines << StringIO.new.tap do |buf|
             buf << " " * INDENT << color.green(name.to_s)
             if sub.desc
               buf << " " * (label_width - Term.width(name.to_s) + 2)
               indent = INDENT + label_width + 2
               buf << Term.wrap(sub.desc, width - indent).gsub("\n", "\n#{" " * indent}")
             end
-            buf << "\n"
-          end
-        end.string
+          end.string
+        end
+        lines.join("\n")
       end
 
-      # Render separator text at its recorded position between flags.
-      def separator_text(position)
-        StringIO.new.tap do |buf|
-          config.separators.each do |(pos, str)|
-            if pos == position
-              buf << color.blue(str)
-              buf << "\n"
-            end
-          end
-        end.string
+      # Keep blank and multiline separators exactly as supplied.
+      def separator_lines(source, position)
+        source.separators.filter_map { |pos, str| color.blue(str) if pos == position }
       end
 
       # one-liners
       def color = @color ||= Color.new(config.color)
       def desc = Term.wrap(config.desc, width)
-      def widest_label = config.flags.map { Term.width(flag_label(_1)) }.max
 
       protected
 

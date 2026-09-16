@@ -167,6 +167,8 @@ module RunKit
         assert_equal 0, status
         assert_includes output, "Usage: myapp build"
         assert_includes output, "--target"
+        assert_includes output, "Other options:"
+        assert_includes output, "--dry-run"
 
         # bare commands show full help unless naked is disabled
         expected_help = output

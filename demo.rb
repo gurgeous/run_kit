@@ -10,12 +10,6 @@ options = RunKit.parse do |o|
   o.cmd "fetch", "Fetch a URL" do |c|
     c.int "-n", "--count <n>", "How many times to run", default: 1
     c.str "--mode <mode>", "Run quickly, or not", choices: %w[fast slow]
-
-    c.sep
-    c.sep "Dev options\n"
-    c.int "-d", "How many times to run", default: 1
-    c.str "--dmode <mode>", "Run quickly, or not", choices: %w[fast slow]
-
     c.positional "<url>", "URL to fetch"
   end
 

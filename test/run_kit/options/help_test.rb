@@ -40,10 +40,10 @@ module RunKit
 
           Usage: run-kit build [options]
 
-          Options:
+          Other options:
             -h, --help  Show this message
         TEXT
-        assert_equal exp, Help.new(config.commands[:build], 60).to_s
+        assert_equal exp, Help.new(config.commands[:build], 60, root: config).to_s
       end
 
       def test_width
@@ -97,22 +97,45 @@ module RunKit
       def test_commands
         config = base_config.tap do |o|
           o.bool("-n", "--dry-run")
-          o.cmd("build", "Build the project") { |c| c.str("--target") }
+          o.sep("Root footer")
+          o.cmd("build", "Build the project") do |c|
+            c.sep("Build settings:")
+            c.str("--target")
+            c.sep("Build footer")
+          end
           o.cmd("test") { |c| c.bool("--verbose") }
         end.tap(&:prepare!)
 
         exp = <<~TEXT
           Usage: run-kit [options] <command>
 
-          Options:
-            -n, --dry-run
-            -h, --help     Show this message
-
           Commands:
             build  Build the project
             test
+
+          Options:
+            -n, --dry-run
+          Root footer
+            -h, --help     Show this message
         TEXT
         assert_equal exp, Help.new(config).to_s
+
+        exp = <<~TEXT
+          Build the project
+
+          Usage: run-kit build [options]
+
+          Options:
+          Build settings:
+            --target <str>
+          Build footer
+
+          Other options:
+            -n, --dry-run
+          Root footer
+            -h, --help     Show this message
+        TEXT
+        assert_equal exp, Help.new(config.commands[:build], root: config).to_s
       end
 
       def test_commands_wrap
@@ -124,13 +147,13 @@ module RunKit
         exp = <<~TEXT
           Usage: run-kit [options] <command>
 
-          Options:
-            -h, --help  Show this message
-
           Commands:
             build  one two three four five six seven eight nine ten
                    eleven twelve
             test
+
+          Options:
+            -h, --help  Show this message
         TEXT
         assert_equal exp, Help.new(config, 60).to_s
       end
@@ -143,6 +166,16 @@ module RunKit
 
         assert_match(/\e\[1;32m--host\e\[0m/, Help.new(config).to_s)
         assert_match(/\e\[1;33m<name>\e\[0m/, Help.new(config).to_s)
+      end
+
+      def test_separator_spacing
+        config = base_config.tap do
+          _1.bool("--force")
+          _1.sep("Footer\n")
+          _1.sep
+        end.tap(&:prepare!)
+
+        assert_includes Help.new(config).to_s, "  --force\nFooter\n\n\n  -h, --help"
       end
 
       private

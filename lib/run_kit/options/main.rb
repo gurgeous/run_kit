@@ -49,7 +49,7 @@ module RunKit
       def early_exit?(argv)
         if argv.include?("--help") || argv.include?("-h")
           cmd = config.commands[argv.first&.to_sym] || config
-          puts Help.new(cmd)
+          puts Help.new(cmd, root: config)
           return true
         end
         if config.version && (argv.include?("--version") || argv.include?("-v"))
@@ -93,7 +93,7 @@ module RunKit
           return exit_fn(1, error: ex.message)
         end
 
-        puts Help.new(cmd)
+        puts Help.new(cmd, root: config)
         exit_fn(0)
       end
 
@@ -112,7 +112,7 @@ module RunKit
       # appropriately.
       #
 
-      def with_cmd(cmd, &block)
+      def with_cmd(cmd)
         @cmd = cmd
         yield
       end
