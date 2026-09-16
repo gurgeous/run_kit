@@ -74,7 +74,8 @@ module RunKit
             buf << " " * INDENT << color.green(name.to_s)
             if !sub.desc.to_s.empty?
               buf << " " * (label_width - Term.width(name.to_s) + 2)
-              buf << sub.desc
+              indent = INDENT + label_width + 2
+              buf << Term.wrap(sub.desc, width - indent).gsub("\n", "\n#{" " * indent}")
             end
             buf << "\n"
           end

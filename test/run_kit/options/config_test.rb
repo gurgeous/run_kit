@@ -56,19 +56,23 @@ module RunKit
         assert_equal config.flag("--version"), config.version_flag
       end
 
-      def test_override_builtins
+      def test_disable_version
         config = Config.new.tap do
-          _1.bool("-h", "--help")
+          _1.version = false
           _1.bool("-v", "--version")
-          _1.version = "1.2.3"
         end.tap(&:prepare!)
-        assert_nil config.help_flag
+        assert_equal %w[-h --help], config.help_flag.switches
         assert_nil config.version_flag
+      end
 
-        config = Config.new.tap do
-          _1.bool("-h")
-        end.tap(&:prepare!)
-        assert_equal ["--help"], config.help_flag.switches
+      def test_reserved_builtins
+        %w[-h --help -v --version].each do |switch|
+          config = Config.new.tap do
+            _1.version = "1.2.3"
+            _1.bool(switch)
+          end
+          assert_raises(ArgumentError, switch) { config.prepare! }
+        end
       end
 
       def test_invalid_declarations

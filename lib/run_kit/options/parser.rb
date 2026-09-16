@@ -18,8 +18,7 @@ module RunKit
         # 1. naked?
         raise NakedRequested if config.naked? && argv.empty?
 
-        # 2. Parse argv. We do this first, because other things can raise and
-        # --help should trump other issues.
+        # 2. Parse argv.
         argv_options = parse_argv(argv, passthru:)
 
         # 3. defaults => ENV => ARGV
@@ -83,7 +82,6 @@ module RunKit
 
         # -x or --xyz?
         if (flag = config.flag(switch))
-          builtin!(flag)
           param = queue.shift if flag.takes_param? && separator.empty?
           return {flag.key => flag.parse(switch, param)}
         end
@@ -109,7 +107,6 @@ module RunKit
           switch = "-#{group[idx]}"
           flag = config.flag(switch)
           raise Error, "unexpected argument '#{group}' found" unless flag
-          builtin!(flag)
 
           # For `-qnLee`, `Lee` belongs to `-n`; for `-qn Lee`, shift the queue.
           if flag.takes_param?
@@ -141,11 +138,6 @@ module RunKit
       #
       # helpers
       #
-
-      def builtin!(flag)
-        raise HelpRequested if flag == config.help_flag
-        raise VersionRequested if flag == config.version_flag
-      end
 
       def find_negated_flag(switch)
         if (m = Flag::NEGATE_RE.match(switch))

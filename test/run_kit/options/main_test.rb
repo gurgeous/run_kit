@@ -67,6 +67,52 @@ module RunKit
         assert_includes output, "try 'run-kit --help'"
       end
 
+      def test_builtin_scan
+        previous = ENV["RUN_KIT_TEST_COUNT"]
+        ENV["RUN_KIT_TEST_COUNT"] = "invalid"
+
+        [
+          [%w[--help build], "Usage: run-kit [options] <command>"],
+          [%w[--dry-run build --help], "Usage: run-kit [options] <command>"],
+          [%w[--required build --help], "Usage: run-kit [options] <command>"],
+          [%w[nonsense build --help], "Usage: run-kit [options] <command>"],
+          [%w[build --help], "Usage: run-kit build"],
+          [%w[build --unknown -h], "Usage: run-kit build"],
+          [%w[build -- --help], "Usage: run-kit build"],
+          [%w[build --token --help], "Usage: run-kit build"],
+          [%w[--version], "run-kit 1.2.3"],
+          [%w[--dry-run build --version], "run-kit 1.2.3"],
+          [%w[build -v], "run-kit build 1.2.3"],
+          [%w[build --version], "run-kit build 1.2.3"],
+        ].each do |argv, expected|
+          status = nil
+          main = Main.new.tap do
+            _1.config.app_name = "run-kit"
+            _1.config.color = false
+            _1.config.version = "1.2.3"
+            _1.config.int("--count", env: "RUN_KIT_TEST_COUNT")
+            _1.config.str("--required", required: true)
+            _1.config.cmd("build") { |c| c.str("--token", required: true) }
+            _1.config.exit = ->(value) { status = value }
+          end
+          output, stderr = capture_io { main.parse(argv) }
+          assert_equal 0, status, argv.inspect
+          assert_equal "", stderr, argv.inspect
+          assert_includes output, expected, argv.inspect
+        end
+      ensure
+        previous ? ENV["RUN_KIT_TEST_COUNT"] = previous : ENV.delete("RUN_KIT_TEST_COUNT")
+      end
+
+      def test_disabled_version
+        main = Main.new.tap do
+          _1.config.version = false
+          _1.config.bool("-v", "--version")
+        end
+        options = main.parse(["-v"])
+        assert_equal true, options.version
+      end
+
       def test_error
         status = nil
         _, stderr = capture_io do

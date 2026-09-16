@@ -103,8 +103,8 @@ module RunKit
         return if @prepared
         @prepared = true
         @exit ||= lambda { |status| Kernel.exit(status) }
-        @help_flag = add_builtin(["-h", "--help"], "Show this message")
-        @version_flag = add_builtin(["-v", "--version"], "Show version") if version
+        @help_flag = bool("-h", "--help", "Show this message")
+        @version_flag = bool("-v", "--version", "Show version") if version
 
         # prepare subcmds, mostly including copying things from parent
         commands.each do |name, cmd|
@@ -115,13 +115,6 @@ module RunKit
       end
 
       protected
-
-      # Add help/version flags, but only for switches the user did not override.
-      def add_builtin(switches, help_text)
-        unused = switches.select { !flag?(_1) }
-        return if unused.empty?
-        add_flag(Flag.new(:bool, unused + [help_text]))
-      end
 
       def add_flag(flag)
         # dup check

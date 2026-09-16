@@ -31,16 +31,32 @@ module RunKit
       def parse(argv)
         config.prepare!
 
+        # Builtins win over parsing and validation, anywhere in argv.
+        if (output = builtin_output(argv))
+          puts output
+          return exit_fn(0)
+        end
+
         begin
           options = config.commands.empty? ? parse0(config, argv) : subcommand(argv)
           klass = Data.define(*options.keys)
           klass.new(**options)
-        rescue Error, ExitRequested => ex
+        rescue Error, NakedRequested => ex
           handle_error(ex)
         end
       end
 
       protected
+
+      # The first builtin wins; only argv's first argument selects its command.
+      def builtin_output(argv)
+        cmd = config.commands[argv.first&.to_sym] || config
+        argv.each do |item|
+          return Help.new(cmd) if %w[--help -h].include?(item)
+          return "#{cmd.app_name} #{cmd.version}" if cmd.version && %w[--version -v].include?(item)
+        end
+        nil
+      end
 
       # Internal parse, used for both main cmd and subcommands. Keep track of
       # which command we are parsing, so we can handle early exits and errors
@@ -76,11 +92,7 @@ module RunKit
           return exit_fn(1, error: ex.message)
         end
 
-        case ex
-        when HelpRequested then puts Help.new(cmd)
-        when NakedRequested then puts cmd.naked_message
-        when VersionRequested then puts "#{cmd.app_name} #{cmd.version}"
-        end
+        puts cmd.naked_message
         exit_fn(0)
       end
 
@@ -97,10 +109,7 @@ module RunKit
     class Error < StandardError; end
 
     # early exits
-    class ExitRequested < Exception; end # rubocop:disable Lint/InheritException
-    class HelpRequested < ExitRequested; end
-    class NakedRequested < ExitRequested; end
-    class VersionRequested < ExitRequested; end
+    class NakedRequested < Exception; end # rubocop:disable Lint/InheritException
 
     # main entry point
     def self.parse(argv = ARGV)

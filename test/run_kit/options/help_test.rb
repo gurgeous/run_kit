@@ -93,6 +93,24 @@ module RunKit
         assert_equal exp, Help.new(config).to_s
       end
 
+      def test_commands_wrap
+        config = base_config.tap do
+          _1.cmd("build", "one two three four five six seven eight nine ten eleven twelve")
+          _1.cmd("test")
+        end.tap(&:prepare!)
+
+        exp = <<~TEXT
+          Usage: run-kit [options] <command>
+            -h, --help  Show this message
+
+          Commands:
+            build  one two three four five six seven eight nine ten
+                   eleven twelve
+            test
+        TEXT
+        assert_equal exp, Help.new(config, 60).to_s
+      end
+
       def test_color
         config = base_config.tap do
           _1.color = true
