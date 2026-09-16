@@ -17,6 +17,7 @@ module RunKit
         exp = <<~TEXT
           Usage: run-kit [options] <url>
 
+          Options:
           Connection:
             -H, --host <name>  hostname
             -p, --port <int>   port
@@ -34,9 +35,12 @@ module RunKit
         end.tap(&:prepare!)
 
         exp = <<~TEXT
-          Usage: run-kit build [options]
           Build the project and package all generated files for
           distribution to users
+
+          Usage: run-kit build [options]
+
+          Options:
             -h, --help  Show this message
         TEXT
         assert_equal exp, Help.new(config.commands[:build], 60).to_s
@@ -56,7 +60,7 @@ module RunKit
           _1.bool("--verbose", "verbose output")
         end.tap(&:prepare!)
 
-        assert_match(/\Arun-kit custom usage\n  --verbose/, Help.new(banner).to_s)
+        assert_match(/\Arun-kit custom usage\n\nOptions:\n  --verbose/, Help.new(banner).to_s)
 
         custom = base_config.tap { _1.help = "Custom help\n" }
         assert_equal "Custom help\n", Help.new(custom).to_s
@@ -70,6 +74,8 @@ module RunKit
 
         exp = <<~TEXT
           Usage: run-kit [options]
+
+          Options:
             --force        Overwrite [env: FORCE]
             --token <str>  [env: API_TOKEN]
             -h, --help     Show this message
@@ -97,6 +103,8 @@ module RunKit
 
         exp = <<~TEXT
           Usage: run-kit [options] <command>
+
+          Options:
             -n, --dry-run
             -h, --help     Show this message
 
@@ -115,6 +123,8 @@ module RunKit
 
         exp = <<~TEXT
           Usage: run-kit [options] <command>
+
+          Options:
             -h, --help  Show this message
 
           Commands:
@@ -128,7 +138,6 @@ module RunKit
       def test_color
         config = base_config.tap do
           _1.color = true
-          _1.sep("Options:")
           _1.str("--host <name>", "hostname")
         end.tap(&:prepare!)
 

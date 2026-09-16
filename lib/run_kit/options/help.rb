@@ -22,10 +22,10 @@ module RunKit
         buf = StringIO.new
 
         # desc
-        buf << desc if config.desc
+        buf << desc << "\n\n" if config.desc
 
         # usage: xyz (banner)
-        buf << "\n" << banner << "\n"
+        buf << banner << "\n"
 
         # Options:
         buf << "\n" << color.blue("Options:") << "\n"
@@ -71,13 +71,6 @@ module RunKit
         Term.wrap(text, width)
       end
 
-      # Wrapped desc
-      def desc
-        s = Term.wrap(config.desc, width)
-        s = "#{s}\n"
-        s
-      end
-
       # Render the list of subcommands, aligned like the flag list above.
       def commands_section
         StringIO.new.tap do |buf|
@@ -109,6 +102,7 @@ module RunKit
 
       # one-liners
       def color = @color ||= Color.new(config.color)
+      def desc = Term.wrap(config.desc, width)
       def widest_label = config.flags.map { Term.width(flag_label(_1)) }.max
 
       protected
