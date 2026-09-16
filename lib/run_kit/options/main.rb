@@ -35,9 +35,9 @@ module RunKit
         return exit_fn(0) if early_exit?(argv)
 
         begin
-          options = config.commands.empty? ? parse0(config, argv) : subcommand(argv)
+          options = config.commands.empty? ? parse_with_cmd(config, argv) : subcommand(argv)
           klass = Data.define(*options.keys)
-          klass.new(**options)
+          klass.new(**options).tap { validate(_1) }
         rescue Error, NakedRequested => ex
           handle_error(ex)
         end
@@ -58,19 +58,11 @@ module RunKit
         end
       end
 
-      # Internal parse, used for both main cmd and subcommands. Keep track of
-      # which command we are parsing, so we can handle early exits and errors
-      # appropriately.
-      def parse0(cmd, argv, passthru: false)
-        @cmd = cmd
-        Parser.new(cmd).parse(argv, passthru:)
-      end
-
       # Peek at the first bare argument to pick a subcommand, then parse the
       # rest with its own Config and merge the two option hashes together.
       def subcommand(argv)
         # do our "main" parse before we hit a subcommand
-        main = parse0(config, argv, passthru: true)
+        main = parse_with_cmd(config, argv, passthru: true)
         name, *rest = main[:_args]
         name = name&.to_sym
         raise NakedRequested if !name
@@ -78,13 +70,22 @@ module RunKit
         # find/parse cmd
         cmd = config.commands[name]
         raise Error, "unknown command '#{name}'" if !cmd
-        cmd_options = parse0(cmd, rest)
+        cmd_options = parse_with_cmd(cmd, rest)
 
         # merge
         main.merge(cmd_options).merge(command: name)
       end
 
-      # Render the outcome using the config of the parser that raised it.
+      # Validate the final options, root first.
+      def validate(options)
+        [config, cmd].uniq.each do
+          validate_with_cmd(_1, options)
+        rescue RuntimeError => ex
+          raise Error, ex.message
+        end
+      end
+
+      # Render the outcome using the active parser or validator's config.
       def handle_error(ex)
         if ex.is_a?(Error)
           warn "#{cmd.app_name}: #{ex.message}"
@@ -104,11 +105,32 @@ module RunKit
         config.exit.call(*args)
         nil
       end
+
+      #
+      # with_cmd and friends. Used for both main cmd and subcommands. Keep track
+      # of which command (config) we are workong on, so we can handle errors
+      # appropriately.
+      #
+
+      def with_cmd(cmd, &block)
+        @cmd = cmd
+        yield
+      end
+
+      def parse_with_cmd(cmd, argv, passthru: false)
+        with_cmd(cmd) do
+          Parser.new(cmd).parse(argv, passthru:)
+        end
+      end
+
+      def validate_with_cmd(cmd, options)
+        with_cmd(cmd) do
+          cmd.validate&.call(options)
+        end
+      end
     end
 
     class Error < StandardError; end
-
-    # early exits
     class NakedRequested < Exception; end # rubocop:disable Lint/InheritException
 
     # main entry point

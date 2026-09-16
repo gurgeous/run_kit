@@ -209,6 +209,83 @@ module RunKit
         assert_includes stderr, "myapp build: try 'myapp build --help'"
       end
 
+      def test_validation
+        [nil, false, "ignored"].each do |value|
+          seen = []
+          main = Main.new.tap do
+            _1.config.int("--count", default: 1)
+            _1.config.validate = lambda do |options|
+              seen << options
+              value
+            end
+          end
+          options = main.parse(%w[--count 2])
+          assert_equal 2, options.count
+          assert_equal [options], seen
+          assert_same options, seen.first
+        end
+
+        seen = []
+        main = Main.new.tap do |m|
+          m.config.bool("--force")
+          m.config.validate = ->(options) { seen << [:root, options] }
+          m.config.cmd("build") do |c|
+            c.int("--count", default: 1)
+            c.validate = ->(options) { seen << [:child, options] }
+          end
+        end
+        options = main.parse(%w[--force build --count 2])
+        assert_equal [[:root, options], [:child, options]], seen
+        seen.each { assert_same options, _1.last }
+        assert_equal true, options.force?
+        assert_equal 2, options.count
+        assert_equal :build, options.command
+      end
+
+      def test_validation_errors
+        %i[root child].each do |failing|
+          seen = []
+          status = message = nil
+          main = Main.new.tap do |m|
+            m.config.app_name = "myapp"
+            m.config.exit = ->(code, error) { status, message = code, error }
+            child = m.config.cmd("build") { _1.naked = false }
+            {root: m.config, child:}.each do |name, context|
+              context.validate = lambda do |_options|
+                seen << name
+                raise "invalid combination" if name == failing
+              end
+            end
+          end
+          _, stderr = capture_io { assert_nil main.parse(["build"]) }
+          app = (failing == :root) ? "myapp" : "myapp build"
+          assert_equal "#{app}: invalid combination\n#{app}: try '#{app} --help' for more information\n", stderr
+          assert_equal 1, status
+          assert_equal "invalid combination", message
+          assert_equal((failing == :root) ? [:root] : %i[root child], seen)
+        end
+
+        main = Main.new.tap do
+          _1.config.naked = false
+          _1.config.validate = ->(options) { options.missing_method }
+        end
+        assert_raises(NoMethodError) { main.parse([]) }
+      end
+
+      def test_validation_skipped
+        [[], %w[--help], %w[--version], %w[--unknown], %w[build], %w[build --help], %w[build --unknown]].each do |argv|
+          seen = []
+          main = Main.new.tap do
+            _1.config.version = "1.2.3"
+            _1.config.exit = ->(*) {}
+            _1.config.validate = ->(options) { seen << options }
+            _1.config.cmd("build") { |c| c.validate = ->(options) { seen << options } }
+          end
+          capture_io { main.parse(argv) }
+          assert_equal [], seen, argv.inspect
+        end
+      end
+
       def test_command_key
         ["--command", "<command>"].each do |declaration|
           main = Main.new.tap do |m|

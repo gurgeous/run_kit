@@ -6,7 +6,7 @@
 module RunKit
   module Options
     class Config
-      attr_accessor :app_name, :banner, :color, :desc, :exit, :help, :naked, :version
+      attr_accessor :app_name, :banner, :color, :desc, :exit, :help, :naked, :validate, :version
       attr_reader :commands, :flags, :help_flag, :lookup, :positionals, :separators, :version_flag
       alias_method :naked?, :naked
 

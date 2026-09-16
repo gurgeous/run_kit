@@ -37,7 +37,13 @@ o.bool "--force", env: true              # ENV["FORCE"]
 o.str "--token", env: "API_TOKEN"        # ENV["API_TOKEN"]
 ```
 
-Configured variables appear in `--help`. Command-line values override ENV, which overrides defaults. Boolean ENV values accept `true/1/yes/on` and `false/0/no/off/empty`, ignoring case.
+Custom validation:
+
+```ruby
+o.validate = lambda do |options|
+  raise "--count must be positive" if options.count <= 0
+end
+```
 
 Also supports subcommands, `git`-style:
 
@@ -124,15 +130,12 @@ RunKit also installs a small set of core extensions to assist with bin scripts.
 
 Note: There has been some effort to get the Pathname helpers into Ruby itself, without much success.
 
-### Future Work
-
-- custom validation hook for Options
-
 ### Changelog
 
 #### unreleased
 
 - add subcommand support (`o.cmd`)
+- add custom option validation (`o.validate`)
 
 #### 0.1.3 (Sep 2026)
 
