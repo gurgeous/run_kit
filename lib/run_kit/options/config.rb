@@ -6,7 +6,7 @@
 module RunKit
   module Options
     class Config
-      attr_accessor :app_name, :banner, :color, :desc, :exit, :help, :naked, :validate, :version
+      attr_accessor :app_name, :banner, :color, :desc, :exit, :help, :naked, :parent, :validate, :version
       attr_reader :commands, :flags, :help_flag, :lookup, :positionals, :separators, :version_flag
       alias_method :naked?, :naked
 
@@ -31,6 +31,7 @@ module RunKit
         name = name.to_sym
         raise ArgumentError, "duplicate command #{name}" if commands.key?(name)
         Config.new.tap do
+          _1.parent = self
           _1.desc = desc
           yield _1 if block_given?
           raise ArgumentError, "nested commands are not supported" if _1.commands.any?

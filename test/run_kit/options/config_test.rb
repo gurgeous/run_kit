@@ -105,6 +105,8 @@ module RunKit
 
         assert_equal %i[build test], config.commands.keys
         build = config.commands[:build]
+        assert_nil config.parent
+        assert_same config, build.parent
         assert_equal "myapp build", build.app_name
         assert_equal "Build the project", build.desc
         assert_true build.naked?

@@ -43,7 +43,7 @@ module RunKit
           Other options:
             -h, --help  Show this message
         TEXT
-        assert_equal exp, Help.new(config.commands[:build], 60, root: config).to_s
+        assert_equal exp, Help.new(config.commands[:build], 60).to_s
       end
 
       def test_width
@@ -135,7 +135,7 @@ module RunKit
           Root footer
             -h, --help     Show this message
         TEXT
-        assert_equal exp, Help.new(config.commands[:build], root: config).to_s
+        assert_equal exp, Help.new(config.commands[:build]).to_s
       end
 
       def test_commands_wrap

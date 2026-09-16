@@ -8,11 +8,10 @@ module RunKit
     class Help
       INDENT = 2
 
-      attr_reader :config, :root, :width
+      attr_reader :config, :width
 
-      def initialize(config, width = nil, root: nil)
+      def initialize(config, width = nil)
         @config = config
-        @root = root unless root == config
         @width = (width || Term.winsize[1]).clamp(60, 100)
       end
 
@@ -23,8 +22,8 @@ module RunKit
           _1 << desc if config.desc
           _1 << banner
           _1 << commands_text if config.commands.any?
-          _1 << flags_text(config, "Options:", builtins: !root)
-          _1 << flags_text(root, "Other options:") if root
+          _1 << flags_text(config, "Options:", builtins: !config.parent)
+          _1 << flags_text(config.parent, "Other options:") if config.parent
         end.compact.join("\n\n")
         "#{help}\n"
       end

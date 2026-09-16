@@ -49,7 +49,7 @@ module RunKit
       def early_exit?(argv)
         if argv.include?("--help") || argv.include?("-h")
           cmd = config.commands[argv.first&.to_sym] || config
-          puts Help.new(cmd, root: config)
+          puts Help.new(cmd)
           return true
         end
         if config.version && (argv.include?("--version") || argv.include?("-v"))
@@ -78,7 +78,7 @@ module RunKit
 
       # Validate the final options, root first.
       def validate(options)
-        [config, cmd].uniq.each do
+        [cmd.parent, cmd].compact.each do
           validate_with_cmd(_1, options)
         rescue RuntimeError => ex
           raise Error, ex.message
@@ -93,7 +93,7 @@ module RunKit
           return exit_fn(1, error: ex.message)
         end
 
-        puts Help.new(cmd, root: config)
+        puts Help.new(cmd)
         exit_fn(0)
       end
 
