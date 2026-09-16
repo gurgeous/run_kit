@@ -6,15 +6,13 @@
 module RunKit
   module Options
     class Config
-      attr_accessor :app_name, :banner, :color, :desc, :exit, :help, :naked, :parent, :validate, :version
-      attr_reader :commands, :flags, :help_flag, :lookup, :positionals, :separators, :version_flag
+      attr_accessor :banner, :color, :desc, :exit, :help, :naked, :name, :parent, :validate, :version
+      attr_reader :help_flag, :version_flag
       alias_method :naked?, :naked
 
-      def initialize
-        @app_name = File.basename($PROGRAM_NAME)
+      def initialize(name: nil)
         @naked = true
-        @lookup = {}
-        @commands, @flags, @positionals, @separators = {}, [], [], []
+        @name = name || File.basename($PROGRAM_NAME)
       end
 
       # Add a positional param declared as `<url>`.
@@ -28,9 +26,8 @@ module RunKit
 
       # Add a subcommand with its own nested Config, eg `myapp build`.
       def cmd(name, desc = nil)
-        name = name.to_sym
         raise ArgumentError, "duplicate command #{name}" if commands.key?(name)
-        Config.new.tap do
+        Config.new(name:).tap do
           _1.parent = self
           _1.desc = desc
           yield _1 if block_given?
@@ -75,6 +72,7 @@ module RunKit
       end
 
       # long-form aliases
+      alias_method :app_name=, :name=
       alias_method :boolean, :bool
       alias_method :command, :cmd
       alias_method :integer, :int
@@ -95,24 +93,35 @@ module RunKit
       # one-liners
       def flag(switch) = lookup[switch]
       def flag?(switch) = lookup.key?(switch)
+      def full_name = parent ? "#{parent.full_name} #{name}" : name
       def key?(key) = lookup.key?(key)
-      def naked_message = "#{app_name}: try '#{app_name} --help' for more information"
+      def naked_message = "#{full_name}: try '#{full_name} --help' for more information"
       def required = flags.select(&:required?)
+
+      # memoized accessors
+      def commands = @commands ||= {}
+      def flags = @flags ||= []
+      def lookup = @lookup ||= {}
+      def positionals = @positionals ||= []
+      def separators = @separators ||= []
 
       # Complete one-time setup after the caller has declared overrides.
       def prepare!
         return if @prepared
         @prepared = true
+
+        # Children inherit shared settings before adding builtins.
+        if parent
+          self.color, self.exit, self.version = parent.color, parent.exit, parent.version
+        end
+
+        # now defaults
         @exit ||= lambda { |status| Kernel.exit(status) }
         @help_flag = bool("-h", "--help", "Show this message")
         @version_flag = bool("-v", "--version", "Show version") if version
 
-        # prepare subcmds, mostly including copying things from parent
-        commands.each do |name, cmd|
-          cmd.app_name = "#{app_name} #{name}"
-          cmd.color, cmd.exit, cmd.version = color, exit, version
-          cmd.prepare!
-        end
+        # setup subcommands
+        commands.each_value(&:prepare!)
       end
 
       protected

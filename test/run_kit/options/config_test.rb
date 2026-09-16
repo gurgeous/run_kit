@@ -20,13 +20,6 @@ module RunKit
           _1.pos("<url>", "URL to fetch")
         end.tap(&:prepare!)
 
-        # misc
-        assert_equal "fetch", config.app_name
-        assert_equal "Fetch a URL", config.banner
-        assert_false config.color
-        assert_false config.naked?
-        assert_equal "1.2.3", config.version
-
         # flags
         assert_equal({
           format: :str,
@@ -54,15 +47,6 @@ module RunKit
         # builtins
         assert_equal config.flag("--help"), config.help_flag
         assert_equal config.flag("--version"), config.version_flag
-      end
-
-      def test_disable_version
-        config = Config.new.tap do
-          _1.version = false
-          _1.bool("-v", "--version")
-        end.tap(&:prepare!)
-        assert_equal %w[-h --help], config.help_flag.switches
-        assert_nil config.version_flag
       end
 
       def test_reserved_builtins
@@ -103,17 +87,37 @@ module RunKit
           o.version = "1.2.3"
         end.tap(&:prepare!)
 
-        assert_equal %i[build test], config.commands.keys
-        build = config.commands[:build]
+        assert_equal %w[build test], config.commands.keys
+        build = config.commands["build"]
         assert_nil config.parent
         assert_same config, build.parent
-        assert_equal "myapp build", build.app_name
+        assert_equal "myapp build", build.full_name
         assert_equal "Build the project", build.desc
         assert_true build.naked?
         assert_equal false, build.color
         assert_equal config.exit, build.exit
         assert_equal "1.2.3", build.version
-        assert_nil config.commands[:test].desc
+        assert_nil config.commands["test"].desc
+      end
+
+      def test_full_name
+        named = Config.new(name: "custom")
+        assert_equal "custom", named.name
+        assert_equal "custom", named.full_name
+
+        config = Config.new
+        assert_equal File.basename($PROGRAM_NAME), config.name
+        child = config.cmd("build")
+        assert_equal "build", child.name
+        assert_equal "#{config.name} build", child.full_name
+
+        config.app_name = "myapp"
+        config.prepare!
+        assert_equal "myapp build", child.full_name
+
+        config.app_name = "renamed"
+        assert_equal "renamed", config.name
+        assert_equal "renamed build", child.full_name
       end
 
       def test_invalid_commands

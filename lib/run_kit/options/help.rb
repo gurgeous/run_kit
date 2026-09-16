@@ -65,7 +65,7 @@ module RunKit
       # Build the usage line from the configured app name and positionals.
       def banner
         text = config.banner
-        text ||= [color.blue("Usage:"), color.green(config.app_name), "[options]"].tap do
+        text ||= [color.blue("Usage:"), color.green(config.full_name), "[options]"].tap do
           _1.push(*config.positionals.map(&:meta))
           _1.push(color.yellow("<command>")) if config.commands.any?
         end.join(" ")
@@ -75,14 +75,14 @@ module RunKit
       # Render the list of subcommands, aligned like the flag list above.
       def commands_text
         lines = [color.blue("Commands:")]
-        label_width = config.commands.keys.map { Term.width(_1.to_s) }.max
-        config.commands.each do |name, sub|
+        label_width = config.commands.keys.map { Term.width(_1) }.max
+        config.commands.each do |name, child|
           lines << StringIO.new.tap do |buf|
-            buf << " " * INDENT << color.green(name.to_s)
-            if sub.desc
-              buf << " " * (label_width - Term.width(name.to_s) + 2)
+            buf << " " * INDENT << color.green(name)
+            if child.desc
+              buf << " " * (label_width - Term.width(name) + 2)
               indent = INDENT + label_width + 2
-              buf << Term.wrap(sub.desc, width - indent).gsub("\n", "\n#{" " * indent}")
+              buf << Term.wrap(child.desc, width - indent).gsub("\n", "\n#{" " * indent}")
             end
           end.string
         end

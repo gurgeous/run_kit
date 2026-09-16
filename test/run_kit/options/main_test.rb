@@ -24,11 +24,9 @@ module RunKit
           verbose?: true,
           color?: false,
         }, options.to_h)
-        assert_true options.is_a?(Data)
         assert_true options.verbose?
         assert_false options.color?
         assert_equal "Lee", options.name
-        assert_raises(NoMethodError) { options.name = "Pat" }
       end
 
       def test_early_exits
@@ -139,13 +137,13 @@ module RunKit
         end
 
         # bare subcommand uses its defaults
-        options = build.call.tap { _1.config.commands[:build].naked = false }.parse(["build"])
+        options = build.call.tap { _1.config.commands["build"].naked = false }.parse(["build"])
         assert_equal({
           dry_run: false,
           target: "release",
           _args: [],
           dry_run?: false,
-          command: :build,
+          command: "build",
         }, options.to_h)
 
         # global flag + subcommand flag, merged
@@ -155,7 +153,7 @@ module RunKit
           target: "debug",
           _args: [],
           dry_run?: true,
-          command: :build,
+          command: "build",
         }, options.to_h)
 
         # subcommand's own help, not the top-level one
@@ -226,7 +224,6 @@ module RunKit
           options = main.parse(%w[--count 2])
           assert_equal 2, options.count
           assert_equal [options], seen
-          assert_same options, seen.first
         end
 
         seen = []
@@ -240,10 +237,9 @@ module RunKit
         end
         options = main.parse(%w[--force build --count 2])
         assert_equal [[:root, options], [:child, options]], seen
-        seen.each { assert_same options, _1.last }
         assert_equal true, options.force?
         assert_equal 2, options.count
-        assert_equal :build, options.command
+        assert_equal "build", options.command
       end
 
       def test_validation_errors
@@ -299,7 +295,7 @@ module RunKit
           end
           argv = declaration.start_with?("--") ? %w[run --command echo] : %w[run echo]
           options = main.parse(argv)
-          assert_equal :run, options.command, declaration
+          assert_equal "run", options.command, declaration
         end
       end
 

@@ -57,7 +57,7 @@ o.cmd "test", "Run tests" do |c|
 end
 
 # myapp build --target debug
-# => #<data command=:build, dry_run=false, target="debug", _args=[]>
+# => #<data command="build", dry_run=false, target="debug", _args=[]>
 ```
 
 ## RunKit::Shell

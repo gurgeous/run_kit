@@ -22,10 +22,11 @@
 module RunKit
   module Options
     class Main
+      # config is the root; cmd is the active parser or validator's config.
       attr_reader :cmd, :config
 
       def initialize = @config = Config.new
-      def app_name = config.app_name
+      def full_name = config.full_name
 
       # Parse argv and turn internal parser outcomes into CLI behavior.
       def parse(argv)
@@ -48,12 +49,12 @@ module RunKit
       # Handle --help or --version
       def early_exit?(argv)
         if argv.include?("--help") || argv.include?("-h")
-          cmd = config.commands[argv.first&.to_sym] || config
-          puts Help.new(cmd)
+          selected = config.commands[argv.first] || config
+          puts Help.new(selected)
           return true
         end
         if config.version && (argv.include?("--version") || argv.include?("-v"))
-          puts "#{app_name} #{config.version}"
+          puts "#{full_name} #{config.version}"
           return true
         end
       end
@@ -61,19 +62,18 @@ module RunKit
       # Peek at the first bare argument to pick a subcommand, then parse the
       # rest with its own Config and merge the two option hashes together.
       def subcommand(argv)
-        # do our "main" parse before we hit a subcommand
-        main = parse_with_cmd(config, argv, passthru: true)
-        name, *rest = main[:_args]
-        name = name&.to_sym
+        # Parse root options before the subcommand.
+        root_options = parse_with_cmd(config, argv, passthru: true)
+        name, *rest = root_options[:_args]
         raise NakedRequested if !name
 
-        # find/parse cmd
-        cmd = config.commands[name]
-        raise Error, "unknown command '#{name}'" if !cmd
-        cmd_options = parse_with_cmd(cmd, rest)
+        # Find and parse the child.
+        child = config.commands[name]
+        raise Error, "unknown command '#{name}'" if !child
+        child_options = parse_with_cmd(child, rest)
 
         # merge
-        main.merge(cmd_options).merge(command: name)
+        root_options.merge(child_options).merge(command: name)
       end
 
       # Validate the final options, root first.
@@ -88,7 +88,7 @@ module RunKit
       # Render the outcome using the active cmd.
       def handle_error(ex)
         if ex.is_a?(Error)
-          warn "#{cmd.app_name}: #{ex.message}"
+          warn "#{cmd.full_name}: #{ex.message}"
           warn cmd.naked_message
           return exit_fn(1, error: ex.message)
         end
@@ -107,9 +107,8 @@ module RunKit
       end
 
       #
-      # with_cmd and friends. Used for both main cmd and subcommands. Keep track
-      # of which command (config) we are workong on, so we can handle errors
-      # appropriately.
+      # Keep the active config after a failure so the outer rescue can use it.
+      # This is error context, not a push/pop command stack.
       #
 
       def with_cmd(cmd)
