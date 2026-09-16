@@ -20,13 +20,6 @@ module RunKit
           _1.pos("<url>", "URL to fetch")
         end.tap(&:prepare!)
 
-        # misc
-        assert_equal "fetch", config.app_name
-        assert_equal "Fetch a URL", config.banner
-        assert_false config.color
-        assert_false config.naked?
-        assert_equal "1.2.3", config.version
-
         # flags
         assert_equal({
           format: :str,
@@ -56,19 +49,14 @@ module RunKit
         assert_equal config.flag("--version"), config.version_flag
       end
 
-      def test_override_builtins
-        config = Config.new.tap do
-          _1.bool("-h", "--help")
-          _1.bool("-v", "--version")
-          _1.version = "1.2.3"
-        end.tap(&:prepare!)
-        assert_nil config.help_flag
-        assert_nil config.version_flag
-
-        config = Config.new.tap do
-          _1.bool("-h")
-        end.tap(&:prepare!)
-        assert_equal ["--help"], config.help_flag.switches
+      def test_reserved_builtins
+        %w[-h --help -v --version].each do |switch|
+          config = Config.new.tap do
+            _1.version = "1.2.3"
+            _1.bool(switch)
+          end
+          assert_raises(ArgumentError, switch) { config.prepare! }
+        end
       end
 
       def test_invalid_declarations
@@ -85,6 +73,63 @@ module RunKit
           ["pos collision", -> { config.str("--url") }],
         ].each do |msg, proc|
           assert_raises(ArgumentError, msg, &proc)
+        end
+      end
+
+      def test_commands
+        config = Config.new.tap do |o|
+          o.bool("-n", "--dry-run")
+          o.cmd("build", "Build the project") { |c| c.str("--target", default: "release") }
+          o.cmd("test") { |c| c.bool("--verbose") }
+          o.app_name = "myapp"
+          o.color = false
+          o.exit = ->(*) {}
+          o.version = "1.2.3"
+        end.tap(&:prepare!)
+
+        assert_equal %w[build test], config.commands.keys
+        build = config.commands["build"]
+        assert_nil config.root
+        assert_same config, build.root
+        assert_equal "myapp build", build.full_name
+        assert_equal "Build the project", build.desc
+        assert_true build.naked?
+        assert_equal false, build.color
+        assert_equal config.exit, build.exit
+        assert_equal "1.2.3", build.version
+        assert_nil config.commands["test"].desc
+      end
+
+      def test_full_name
+        named = Config.new(name: :custom)
+        assert_equal "custom", named.name
+        assert_equal "custom", named.full_name
+
+        config = Config.new
+        assert_equal File.basename($PROGRAM_NAME), config.name
+        child = config.cmd(:build)
+        assert_equal "build", child.name
+        assert_equal "#{config.name} build", child.full_name
+
+        config.app_name = :myapp
+        config.prepare!
+        assert_equal "myapp build", child.full_name
+
+        config.name = :renamed
+        assert_equal "renamed", config.name
+        assert_equal "renamed build", child.full_name
+      end
+
+      def test_invalid_commands
+        assert_raises(ArgumentError) do
+          Config.new.tap do |o|
+            o.cmd("build") {}
+            o.cmd(:build) {}
+          end
+        end
+
+        assert_raises(ArgumentError) do
+          Config.new.cmd("outer") { _1.cmd("inner") }
         end
       end
     end

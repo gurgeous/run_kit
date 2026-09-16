@@ -16,67 +16,125 @@
 # | meta       | placeholder shown for a param      | <xxx> from `--port <xxx>` |
 # | positional | configured required param slot     | o.positional "<url>"      |
 # | separator  | help section heading               | "Network:"                |
+# | command    | subcommand with its own Config     | o.cmd "build" { ... }     |
 #
 
 module RunKit
   module Options
     class Main
-      attr_reader :config
+      # root is the top-level config; ctx is the active parser or validator's config.
+      attr_reader :ctx, :root
 
-      def initialize = @config = Config.new
-      def app_name = config.app_name
+      def initialize = @root = Config.new
 
       # Parse argv and turn internal parser outcomes into CLI behavior.
       def parse(argv)
-        config.prepare!
+        @ctx = root
+        root.prepare!
+
+        # handle --help and --version
+        return exit_fn(0) if early_exit?(argv)
 
         begin
-          options = Parser.new(config).parse(argv)
+          options = root.commands.empty? ? parse_with_ctx(root, argv) : subcommand(argv)
           klass = Data.define(*options.keys)
-          klass.new(**options)
-        rescue Error => ex
-          warn "#{app_name}: #{ex.message}"
-          warn "#{app_name}: try '#{app_name} --help' for more information"
-          exit_fn(1, error: ex.message)
-        rescue HelpRequested, NakedRequested, VersionRequested => ex
-          early_exit(ex)
-          exit_fn(0)
+          klass.new(**options).tap { validate(_1) }
+        rescue Error, NakedRequested => ex
+          handle_error(ex)
         end
       end
 
       protected
 
-      def early_exit(ex)
-        case ex
-        when HelpRequested
-          puts Help.new(config)
-        when NakedRequested
-          puts "#{app_name}: try '#{app_name} --help' for more information"
-        when VersionRequested
-          puts "#{app_name} #{config.version}"
+      # Handle --help or --version
+      def early_exit?(argv)
+        if argv.include?("--help") || argv.include?("-h")
+          selected = root.commands[argv.first] || root
+          puts Help.new(selected)
+          return true
         end
+        if root.version && (argv.include?("--version") || argv.include?("-v"))
+          puts "#{root.name} #{root.version}"
+          return true
+        end
+      end
+
+      # Peek at the first bare argument to pick a subcommand, then parse the
+      # rest with its own Config and merge the two option hashes together.
+      def subcommand(argv)
+        # Parse root options before the subcommand.
+        root_options = parse_with_ctx(root, argv, passthru: true)
+        name, *rest = root_options[:_args]
+        raise NakedRequested if !name
+
+        # Find and parse the child.
+        child = root.commands[name]
+        raise Error, "unknown command '#{name}'" if !child
+        child_options = parse_with_ctx(child, rest)
+
+        # merge
+        root_options.merge(child_options).merge(command: name)
+      end
+
+      # Validate the final options, root first.
+      def validate(options)
+        [ctx.root, ctx].compact.each do
+          validate_with_ctx(_1, options)
+        rescue RuntimeError => ex
+          raise Error, ex.message
+        end
+      end
+
+      # Render the outcome using the active context.
+      def handle_error(ex)
+        if ex.is_a?(Error)
+          warn "#{ctx.full_name}: #{ex.message}"
+          warn "#{ctx.full_name}: try '#{ctx.full_name} --help' for more information"
+          return exit_fn(1, error: ex.message)
+        end
+
+        puts Help.new(ctx)
+        exit_fn(0)
       end
 
       def exit_fn(status, error: nil)
         args = [].tap do
           _1 << status
-          _1 << error if config.exit.arity == 2
+          _1 << error if root.exit.arity == 2
         end
-        config.exit.call(*args)
+        root.exit.call(*args)
         nil
+      end
+
+      #
+      # Keep the active config after a failure so the outer rescue can use it.
+      # This is error context, not a push/pop command stack.
+      #
+
+      def with_ctx(ctx)
+        @ctx = ctx
+        yield
+      end
+
+      def parse_with_ctx(ctx, argv, passthru: false)
+        with_ctx(ctx) do
+          Parser.new(ctx).parse(argv, passthru:)
+        end
+      end
+
+      def validate_with_ctx(ctx, options)
+        with_ctx(ctx) do
+          ctx.validate&.call(options)
+        end
       end
     end
 
     class Error < StandardError; end
-
-    # early exits
-    class HelpRequested < Exception; end # rubocop:disable Lint/InheritException
     class NakedRequested < Exception; end # rubocop:disable Lint/InheritException
-    class VersionRequested < Exception; end # rubocop:disable Lint/InheritException
 
     # main entry point
     def self.parse(argv = ARGV)
-      Main.new.tap { yield _1.config if block_given? }.parse(argv)
+      Main.new.tap { yield _1.root if block_given? }.parse(argv)
     end
   end
 end

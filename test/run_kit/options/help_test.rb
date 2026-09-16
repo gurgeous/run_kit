@@ -17,6 +17,7 @@ module RunKit
         exp = <<~TEXT
           Usage: run-kit [options] <url>
 
+          Options:
           Connection:
             -H, --host <name>  hostname
             -p, --port <int>   port
@@ -26,6 +27,23 @@ module RunKit
             -v, --version      Show version
         TEXT
         assert_equal exp, Help.new(config).to_s
+      end
+
+      def test_command_description
+        config = base_config.tap do
+          _1.cmd("build", "Build the project and package all generated files for distribution to users")
+        end.tap(&:prepare!)
+
+        exp = <<~TEXT
+          Build the project and package all generated files for
+          distribution to users
+
+          Usage: run-kit build [options]
+
+          Other options:
+            -h, --help  Show this message
+        TEXT
+        assert_equal exp, Help.new(config.commands["build"], 60).to_s
       end
 
       def test_width
@@ -42,7 +60,7 @@ module RunKit
           _1.bool("--verbose", "verbose output")
         end.tap(&:prepare!)
 
-        assert_match(/\Arun-kit custom usage\n  --verbose/, Help.new(banner).to_s)
+        assert_match(/\Arun-kit custom usage\n\nOptions:\n  --verbose/, Help.new(banner).to_s)
 
         custom = base_config.tap { _1.help = "Custom help\n" }
         assert_equal "Custom help\n", Help.new(custom).to_s
@@ -56,6 +74,8 @@ module RunKit
 
         exp = <<~TEXT
           Usage: run-kit [options]
+
+          Options:
             --force        Overwrite [env: FORCE]
             --token <str>  [env: API_TOKEN]
             -h, --help     Show this message
@@ -74,15 +94,88 @@ module RunKit
         )
       end
 
+      def test_commands
+        config = base_config.tap do |o|
+          o.bool("-n", "--dry-run")
+          o.sep("Root footer")
+          o.cmd("build", "Build the project") do |c|
+            c.sep("Build settings:")
+            c.str("--target")
+            c.sep("Build footer")
+          end
+          o.cmd("test") { |c| c.bool("--verbose") }
+        end.tap(&:prepare!)
+
+        exp = <<~TEXT
+          Usage: run-kit [options] <command>
+
+          Commands:
+            build  Build the project
+            test
+
+          Options:
+            -n, --dry-run
+          Root footer
+            -h, --help     Show this message
+        TEXT
+        assert_equal exp, Help.new(config).to_s
+
+        exp = <<~TEXT
+          Build the project
+
+          Usage: run-kit build [options]
+
+          Options:
+          Build settings:
+            --target <str>
+          Build footer
+
+          Other options:
+            -n, --dry-run
+          Root footer
+            -h, --help     Show this message
+        TEXT
+        assert_equal exp, Help.new(config.commands["build"]).to_s
+      end
+
+      def test_commands_wrap
+        config = base_config.tap do
+          _1.cmd("build", "one two three four five six seven eight nine ten eleven twelve")
+          _1.cmd("test")
+        end.tap(&:prepare!)
+
+        exp = <<~TEXT
+          Usage: run-kit [options] <command>
+
+          Commands:
+            build  one two three four five six seven eight nine ten
+                   eleven twelve
+            test
+
+          Options:
+            -h, --help  Show this message
+        TEXT
+        assert_equal exp, Help.new(config, 60).to_s
+      end
+
       def test_color
         config = base_config.tap do
           _1.color = true
-          _1.sep("Options:")
           _1.str("--host <name>", "hostname")
         end.tap(&:prepare!)
 
         assert_match(/\e\[1;32m--host\e\[0m/, Help.new(config).to_s)
         assert_match(/\e\[1;33m<name>\e\[0m/, Help.new(config).to_s)
+      end
+
+      def test_separator_spacing
+        config = base_config.tap do
+          _1.bool("--force")
+          _1.sep("Footer\n")
+          _1.sep
+        end.tap(&:prepare!)
+
+        assert_includes Help.new(config).to_s, "  --force\nFooter\n\n\n  -h, --help"
       end
 
       private

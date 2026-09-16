@@ -6,15 +6,17 @@
 module RunKit
   module Options
     class Config
-      attr_accessor :app_name, :banner, :color, :exit, :help, :naked, :version
-      attr_reader :flags, :help_flag, :lookup, :positionals, :separators, :version_flag
+      attr_accessor :banner, :color, :desc, :exit, :help, :naked, :root, :validate, :version
+      attr_reader :help_flag, :name, :version_flag
       alias_method :naked?, :naked
 
-      def initialize
-        @app_name = File.basename($PROGRAM_NAME)
+      def initialize(name: nil)
         @naked = true
-        @lookup = {}
-        @flags, @positionals, @separators = [], [], []
+        self.name = name || Shell.program_name
+      end
+
+      def name=(name)
+        @name = name.to_s
       end
 
       # Add a positional param declared as `<url>`.
@@ -23,6 +25,18 @@ module RunKit
           raise ArgumentError, "duplicate positional #{_1.key}" if key?(_1.key)
           positionals << _1
           lookup[_1.key] = _1
+        end
+      end
+
+      # Add a subcommand with its own nested Config, eg `myapp build`.
+      def cmd(name, desc = nil)
+        name = name.to_s
+        raise ArgumentError, "duplicate command #{name}" if commands.key?(name)
+        Config.new(name:).tap do
+          _1.desc, _1.root = desc, self
+          yield _1 if block_given?
+          raise ArgumentError, "nested commands are not supported" if _1.commands.any?
+          commands[name] = _1
         end
       end
 
@@ -62,7 +76,9 @@ module RunKit
       end
 
       # long-form aliases
+      alias_method :app_name=, :name=
       alias_method :boolean, :bool
+      alias_method :command, :cmd
       alias_method :integer, :int
       alias_method :pathname, :path
       alias_method :positional, :pos
@@ -81,26 +97,37 @@ module RunKit
       # one-liners
       def flag(switch) = lookup[switch]
       def flag?(switch) = lookup.key?(switch)
+      def full_name = root ? "#{root.full_name} #{name}" : name
       def key?(key) = lookup.key?(key)
       def required = flags.select(&:required?)
+
+      # memoized accessors
+      def commands = @commands ||= {}
+      def flags = @flags ||= []
+      def lookup = @lookup ||= {}
+      def positionals = @positionals ||= []
+      def separators = @separators ||= []
 
       # Complete one-time setup after the caller has declared overrides.
       def prepare!
         return if @prepared
         @prepared = true
+
+        # Children inherit shared settings before adding builtins.
+        if root
+          self.color, self.exit, self.version = root.color, root.exit, root.version
+        end
+
+        # now defaults
         @exit ||= lambda { |status| Kernel.exit(status) }
-        @help_flag = add_builtin(["-h", "--help"], "Show this message")
-        @version_flag = add_builtin(["-v", "--version"], "Show version") if version
+        @help_flag = bool("-h", "--help", "Show this message")
+        @version_flag = bool("-v", "--version", "Show version") if version
+
+        # setup subcommands
+        commands.each_value(&:prepare!)
       end
 
       protected
-
-      # Add help/version flags, but only for switches the user did not override.
-      def add_builtin(switches, help_text)
-        unused = switches.select { !flag?(_1) }
-        return if unused.empty?
-        add_flag(Flag.new(:bool, unused + [help_text]))
-      end
 
       def add_flag(flag)
         # dup check

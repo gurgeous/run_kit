@@ -12,14 +12,14 @@ module RunKit
         @config = config
       end
 
-      # Reset transient state, parse argv, and assemble the result.
-      def parse(argv)
+      # Reset transient state, parse argv, and assemble the result. When
+      # passthru is set, scanning halts at the first bare arg (for subcommands).
+      def parse(argv, passthru: false)
         # 1. naked?
         raise NakedRequested if config.naked? && argv.empty?
 
-        # 2. Parse argv. We do this first, because other things can raise and
-        # --help should trump other issues.
-        argv_options = parse_argv(argv)
+        # 2. Parse argv.
+        argv_options = parse_argv(argv, passthru:)
 
         # 3. defaults => ENV => ARGV
         options = {}.merge(config.defaults, parse_env, argv_options)
@@ -41,7 +41,7 @@ module RunKit
       # main parser
       #
 
-      def parse_argv(argv)
+      def parse_argv(argv, passthru: false)
         {}.tap do |result|
           # any non-flags we find below
           operands = []
@@ -52,7 +52,12 @@ module RunKit
             case item
             when Flag::SWITCH_RE, Flag::INLINE_RE then result.merge!(parse_switch(item, Regexp.last_match, queue))
             when /\A-[^-]/ then result.merge!(parse_smashed(item, queue))
-            when "", /\A[^-]/ then operands << item
+            when "", /\A[^-]/
+              operands << item
+              if passthru
+                operands.concat(queue)
+                break
+              end
             when "--" then break operands.concat(queue)
             else; raise Error, "unexpected argument '#{item}' found"
             end
@@ -77,7 +82,6 @@ module RunKit
 
         # -x or --xyz?
         if (flag = config.flag(switch))
-          builtin!(flag)
           param = queue.shift if flag.takes_param? && separator.empty?
           return {flag.key => flag.parse(switch, param)}
         end
@@ -103,7 +107,6 @@ module RunKit
           switch = "-#{group[idx]}"
           flag = config.flag(switch)
           raise Error, "unexpected argument '#{group}' found" unless flag
-          builtin!(flag)
 
           # For `-qnLee`, `Lee` belongs to `-n`; for `-qn Lee`, shift the queue.
           if flag.takes_param?
@@ -135,11 +138,6 @@ module RunKit
       #
       # helpers
       #
-
-      def builtin!(flag)
-        raise HelpRequested if flag == config.help_flag
-        raise VersionRequested if flag == config.version_flag
-      end
 
       def find_negated_flag(switch)
         if (m = Flag::NEGATE_RE.match(switch))
