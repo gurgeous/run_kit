@@ -87,6 +87,41 @@ module RunKit
           assert_raises(ArgumentError, msg, &proc)
         end
       end
+
+      def test_commands
+        config = Config.new.tap do |o|
+          o.bool("-n", "--dry-run")
+          o.cmd("build", "Build the project") { |c| c.str("--target", default: "release") }
+          o.cmd("test") { |c| c.bool("--verbose") }
+          o.app_name = "myapp"
+          o.color = false
+          o.exit = ->(*) {}
+          o.version = "1.2.3"
+        end.tap(&:prepare!)
+
+        assert_equal %i[build test], config.commands.keys
+        build = config.commands[:build]
+        assert_equal "myapp build", build.app_name
+        assert_equal "Build the project", build.desc
+        assert_true build.naked?
+        assert_equal false, build.color
+        assert_equal config.exit, build.exit
+        assert_equal "1.2.3", build.version
+        assert_equal "", config.commands[:test].desc
+      end
+
+      def test_invalid_commands
+        assert_raises(ArgumentError) do
+          Config.new.tap do |o|
+            o.cmd("build") {}
+            o.cmd("build") {}
+          end
+        end
+
+        assert_raises(ArgumentError) do
+          Config.new.cmd("outer") { _1.cmd("inner") }
+        end
+      end
     end
   end
 end

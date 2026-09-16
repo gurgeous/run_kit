@@ -6,15 +6,15 @@
 module RunKit
   module Options
     class Config
-      attr_accessor :app_name, :banner, :color, :exit, :help, :naked, :version
-      attr_reader :flags, :help_flag, :lookup, :positionals, :separators, :version_flag
+      attr_accessor :app_name, :banner, :color, :desc, :exit, :help, :naked, :version
+      attr_reader :commands, :flags, :help_flag, :lookup, :positionals, :separators, :version_flag
       alias_method :naked?, :naked
 
       def initialize
         @app_name = File.basename($PROGRAM_NAME)
         @naked = true
         @lookup = {}
-        @flags, @positionals, @separators = [], [], []
+        @commands, @flags, @positionals, @separators = {}, [], [], []
       end
 
       # Add a positional param declared as `<url>`.
@@ -23,6 +23,18 @@ module RunKit
           raise ArgumentError, "duplicate positional #{_1.key}" if key?(_1.key)
           positionals << _1
           lookup[_1.key] = _1
+        end
+      end
+
+      # Add a subcommand with its own nested Config, eg `myapp build`.
+      def cmd(name, desc = "")
+        name = name.to_sym
+        raise ArgumentError, "duplicate command #{name}" if commands.key?(name)
+        Config.new.tap do
+          _1.desc = desc
+          yield _1 if block_given?
+          raise ArgumentError, "nested commands are not supported" if _1.commands.any?
+          commands[name] = _1
         end
       end
 
@@ -63,6 +75,7 @@ module RunKit
 
       # long-form aliases
       alias_method :boolean, :bool
+      alias_method :command, :cmd
       alias_method :integer, :int
       alias_method :pathname, :path
       alias_method :positional, :pos
@@ -82,15 +95,22 @@ module RunKit
       def flag(switch) = lookup[switch]
       def flag?(switch) = lookup.key?(switch)
       def key?(key) = lookup.key?(key)
+      def naked_message = "#{app_name}: try '#{app_name} --help' for more information"
       def required = flags.select(&:required?)
 
       # Complete one-time setup after the caller has declared overrides.
-      def prepare!
+      def prepare!(parent: nil)
         return if @prepared
         @prepared = true
         @exit ||= lambda { |status| Kernel.exit(status) }
         @help_flag = add_builtin(["-h", "--help"], "Show this message")
         @version_flag = add_builtin(["-v", "--version"], "Show version") if version
+
+        commands.each do |name, cmd|
+          cmd.app_name = "#{app_name} #{name}"
+          cmd.color, cmd.exit, cmd.version = color, exit, version
+          cmd.prepare!
+        end
       end
 
       protected

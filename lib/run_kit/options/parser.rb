@@ -12,14 +12,17 @@ module RunKit
         @config = config
       end
 
-      # Reset transient state, parse argv, and assemble the result.
-      def parse(argv)
+      # Reset transient state, parse argv, and assemble the result. When
+      # passthru is set, flag scanning halts at the first bare argument, so a
+      # subcommand token (and everything after it, `-h` included) passes
+      # through untouched for a later parser to handle.
+      def parse(argv, passthru: false)
         # 1. naked?
         raise NakedRequested if config.naked? && argv.empty?
 
         # 2. Parse argv. We do this first, because other things can raise and
         # --help should trump other issues.
-        argv_options = parse_argv(argv)
+        argv_options = parse_argv(argv, passthru:)
 
         # 3. defaults => ENV => ARGV
         options = {}.merge(config.defaults, parse_env, argv_options)
@@ -41,7 +44,7 @@ module RunKit
       # main parser
       #
 
-      def parse_argv(argv)
+      def parse_argv(argv, passthru: false)
         {}.tap do |result|
           # any non-flags we find below
           operands = []
@@ -52,7 +55,12 @@ module RunKit
             case item
             when Flag::SWITCH_RE, Flag::INLINE_RE then result.merge!(parse_switch(item, Regexp.last_match, queue))
             when /\A-[^-]/ then result.merge!(parse_smashed(item, queue))
-            when "", /\A[^-]/ then operands << item
+            when "", /\A[^-]/
+              operands << item
+              if passthru
+                operands.concat(queue)
+                break
+              end
             when "--" then break operands.concat(queue)
             else; raise Error, "unexpected argument '#{item}' found"
             end

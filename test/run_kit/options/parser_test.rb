@@ -135,6 +135,35 @@ module RunKit
         end
       end
 
+      def test_passthru
+        # flags before the first bare token are parsed normally; the token
+        # and everything after (flag-shaped or not) passes through untouched
+        config = Config.new.tap do
+          _1.naked = false
+          _1.bool("-n", "--dry-run")
+        end
+        options = Parser.new(config).parse(["-n", "build", "-h", "--target", "debug"], passthru: true)
+        assert_equal({
+          dry_run: true,
+          _args: ["build", "-h", "--target", "debug"],
+          dry_run?: true,
+        }, options)
+
+        # `--` still terminates before any bare token is seen
+        options = Parser.new(config).parse(["-n", "--", "-h"], passthru: true)
+        assert_equal({dry_run: true, _args: ["-h"], dry_run?: true}, options)
+
+        # a declared positional still claims the first bare token
+        config.pos("<sub>")
+        options = Parser.new(config).parse(["-n", "build", "--target", "debug"], passthru: true)
+        assert_equal({
+          dry_run: true,
+          sub: "build",
+          _args: ["--target", "debug"],
+          dry_run?: true,
+        }, options)
+      end
+
       def test_errors
         [
           ["unknown", ["--gub"], ->(o) { o.bool("--good") }],

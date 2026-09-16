@@ -6,10 +6,10 @@ RunKit is a small toolkit for cli. It provides option parsing, shell and file he
 
 ```ruby
 # install gem
-$ gem install run_key
+$ gem install run_kit
 
 # or add to your Gemfile
-gem "run_key"
+gem "run_kit"
 ```
 
 ## RunKit::Options
@@ -39,6 +39,21 @@ o.str "--token", env: "API_TOKEN"        # ENV["API_TOKEN"]
 
 Configured variables appear in `--help`. Command-line values override ENV, which overrides defaults. Boolean ENV values accept `true/1/yes/on` and `false/0/no/off/empty`, ignoring case.
 
+Also supports subcommands, `git`-style:
+
+```ruby
+o.bool "-n", "--dry-run"
+o.cmd "build", "Build the project" do |c|
+  c.str "--target <target>", default: "release"
+end
+o.cmd "test", "Run tests" do |c|
+  c.bool "--verbose"
+end
+
+# myapp build --target debug
+# => #<data command=:build, dry_run=false, target="debug", _args=[]>
+```
+
 ## RunKit::Shell
 
 `RunKit::Shell` is a mixin with many helpers for bin scripts:
@@ -48,7 +63,7 @@ Configured variables appear in `--help`. Command-line values override ENV, which
 | `csv_read` / `csv_write`       | Read/write CSV (add .gz for gzip)                   |
 | `file_read` / `file_write`     | Atomic read/write files (add .gz for gzip)          |
 | `json_read` / `json_write`     | Atomic read/write json (add .gz for gzip)           |
-| `jsonl_read / `jsonl_write`    | Atomic read/write jsonl (add .gz for gzip)          |
+| `jsonl_read` / `jsonl_write`   | Atomic read/write jsonl (add .gz for gzip)          |
 |                                |
 | `csv_write_stdout`             | Write CSV to stdout                                 |
 | `gunzip` / `gzip`              | (De)compress a string                               |
@@ -66,7 +81,7 @@ Configured variables appear in `--help`. Command-line values override ENV, which
 |                                |
 | `banner` / `warning` / `fatal` | Pretty banner in green, orange or red (fatal exits) |
 | `program_name`                 | Return executable name                              |
-| `prompt?`                      | Ask use for confirmation                            |
+| `prompt?`                      | Ask user for confirmation                           |
 | `md5` / `sha256`               | Hash strings                                        |
 
 ### RunKit CoreExt
@@ -109,7 +124,15 @@ RunKit also installs a small set of core extensions to assist with bin scripts.
 
 Note: There has been some effort to get the Pathname helpers into Ruby itself, without much success.
 
+### Future Work
+
+- custom validation hook for Options
+
 ### Changelog
+
+#### unreleased
+
+- add subcommand support (`o.cmd`)
 
 #### 0.1.3 (Sep 2026)
 

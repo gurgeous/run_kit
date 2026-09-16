@@ -50,6 +50,8 @@ module RunKit
         end
         buf << separator_text(config.flags.length)
 
+        buf << commands_section if config.commands.any?
+
         buf.string
       end
 
@@ -58,8 +60,25 @@ module RunKit
         text = config.banner
         text ||= [color.blue("Usage:"), color.green(config.app_name), "[options]"].tap do
           _1.push(*config.positionals.map(&:meta))
+          _1.push(color.yellow("<command>")) if config.commands.any?
         end.join(" ")
         Term.wrap(text, width)
+      end
+
+      # Render the list of subcommands, aligned like the flag list above.
+      def commands_section
+        StringIO.new.tap do |buf|
+          buf << "\n" << color.blue("Commands:") << "\n"
+          label_width = config.commands.keys.map { Term.width(_1.to_s) }.max
+          config.commands.each do |name, sub|
+            buf << " " * INDENT << color.green(name.to_s)
+            if !sub.desc.to_s.empty?
+              buf << " " * (label_width - Term.width(name.to_s) + 2)
+              buf << sub.desc
+            end
+            buf << "\n"
+          end
+        end.string
       end
 
       # Render separator text at its recorded position between flags.

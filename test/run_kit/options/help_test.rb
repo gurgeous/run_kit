@@ -74,6 +74,25 @@ module RunKit
         )
       end
 
+      def test_commands
+        config = base_config.tap do |o|
+          o.bool("-n", "--dry-run")
+          o.cmd("build", "Build the project") { |c| c.str("--target") }
+          o.cmd("test") { |c| c.bool("--verbose") }
+        end.tap(&:prepare!)
+
+        exp = <<~TEXT
+          Usage: run-kit [options] <command>
+            -n, --dry-run
+            -h, --help     Show this message
+
+          Commands:
+            build  Build the project
+            test
+        TEXT
+        assert_equal exp, Help.new(config).to_s
+      end
+
       def test_color
         config = base_config.tap do
           _1.color = true

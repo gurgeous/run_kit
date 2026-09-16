@@ -81,6 +81,101 @@ module RunKit
         assert_includes stderr, "try 'run-kit --help'"
       end
 
+      def test_commands
+        build = lambda do
+          Main.new.tap do |m|
+            m.config.app_name = "myapp"
+            m.config.bool("-n", "--dry-run")
+            m.config.cmd("build", "Build the project") { |c| c.str("--target", default: "release") }
+            m.config.cmd("test") { |c| c.bool("--verbose") }
+          end
+        end
+
+        # bare subcommand uses its defaults
+        options = build.call.tap { _1.config.commands[:build].naked = false }.parse(["build"])
+        assert_equal({
+          dry_run: false,
+          target: "release",
+          _args: [],
+          dry_run?: false,
+          command: :build,
+        }, options.to_h)
+
+        # global flag + subcommand flag, merged
+        options = build.call.parse(["-n", "build", "--target", "debug"])
+        assert_equal({
+          dry_run: true,
+          target: "debug",
+          _args: [],
+          dry_run?: true,
+          command: :build,
+        }, options.to_h)
+
+        # subcommand's own help, not the top-level one
+        status = nil
+        output, = capture_io do
+          main = build.call.tap { _1.config.exit = ->(value, *) { status = value } }
+          main.parse(["build", "-h"])
+        end
+        assert_equal 0, status
+        assert_includes output, "Usage: myapp build"
+        assert_includes output, "--target"
+
+        # bare commands show the hint unless naked is disabled
+        output, = capture_io do
+          build.call.tap { _1.config.exit = ->(value, *) { status = value } }.parse(["build"])
+        end
+        assert_equal 0, status
+        assert_equal "myapp build: try 'myapp build --help' for more information\n", output
+
+        # child version uses settings assigned after command declaration
+        output, = capture_io do
+          main = build.call.tap do
+            _1.config.version = "1.2.3"
+            _1.config.exit = ->(value, *) { status = value }
+          end
+          main.parse(["build", "--version"])
+        end
+        assert_equal 0, status
+        assert_equal "myapp build 1.2.3\n", output
+
+        # top-level help lists commands
+        output, = capture_io do
+          build.call.tap { _1.config.exit = ->(*) {} }.parse(["--help"])
+        end
+        assert_includes output, "Commands:"
+        assert_includes output, "build  Build the project"
+
+        # unknown command
+        status = nil
+        _, stderr = capture_io do
+          main = build.call.tap { _1.config.exit = ->(value, *) { status = value } }
+          main.parse(["bogus"])
+        end
+        assert_equal 1, status
+        assert_includes stderr, "unknown command 'bogus'"
+
+        # subcommand errors use the subcommand's context
+        _, stderr = capture_io do
+          build.call.tap { _1.config.exit = ->(*) {} }.parse(["build", "--wat"])
+        end
+        assert_includes stderr, "myapp build: unexpected argument '--wat' found"
+        assert_includes stderr, "myapp build: try 'myapp build --help'"
+      end
+
+      def test_command_key
+        ["--command", "<command>"].each do |declaration|
+          main = Main.new.tap do |m|
+            m.config.cmd("run") do |c|
+              declaration.start_with?("--") ? c.str(declaration) : c.pos(declaration)
+            end
+          end
+          argv = declaration.start_with?("--") ? %w[run --command echo] : %w[run echo]
+          options = main.parse(argv)
+          assert_equal :run, options.command, declaration
+        end
+      end
+
       # Options.parse
       def test_options_parse
         options = Options.parse(["-vn8", "--mode=fast", "https://example.com"]) do
