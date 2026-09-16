@@ -22,21 +22,20 @@
 module RunKit
   module Options
     class Main
-      # config is the root; cmd is the active parser or validator's config.
-      attr_reader :cmd, :config
+      # root is the top-level config; cmd is the active parser or validator's config.
+      attr_reader :cmd, :root
 
-      def initialize = @config = Config.new
-      def full_name = config.full_name
+      def initialize = @root = Config.new
 
       # Parse argv and turn internal parser outcomes into CLI behavior.
       def parse(argv)
-        config.prepare!
+        root.prepare!
 
         # handle --help and --version
         return exit_fn(0) if early_exit?(argv)
 
         begin
-          options = config.commands.empty? ? parse_with_cmd(config, argv) : subcommand(argv)
+          options = root.commands.empty? ? parse_with_cmd(root, argv) : subcommand(argv)
           klass = Data.define(*options.keys)
           klass.new(**options).tap { validate(_1) }
         rescue Error, NakedRequested => ex
@@ -49,12 +48,12 @@ module RunKit
       # Handle --help or --version
       def early_exit?(argv)
         if argv.include?("--help") || argv.include?("-h")
-          selected = config.commands[argv.first] || config
+          selected = root.commands[argv.first] || root
           puts Help.new(selected)
           return true
         end
-        if config.version && (argv.include?("--version") || argv.include?("-v"))
-          puts "#{full_name} #{config.version}"
+        if root.version && (argv.include?("--version") || argv.include?("-v"))
+          puts "#{root.name} #{root.version}"
           return true
         end
       end
@@ -63,12 +62,12 @@ module RunKit
       # rest with its own Config and merge the two option hashes together.
       def subcommand(argv)
         # Parse root options before the subcommand.
-        root_options = parse_with_cmd(config, argv, passthru: true)
+        root_options = parse_with_cmd(root, argv, passthru: true)
         name, *rest = root_options[:_args]
         raise NakedRequested if !name
 
         # Find and parse the child.
-        child = config.commands[name]
+        child = root.commands[name]
         raise Error, "unknown command '#{name}'" if !child
         child_options = parse_with_cmd(child, rest)
 
@@ -78,7 +77,7 @@ module RunKit
 
       # Validate the final options, root first.
       def validate(options)
-        [cmd.parent, cmd].compact.each do
+        [cmd.root, cmd].compact.each do
           validate_with_cmd(_1, options)
         rescue RuntimeError => ex
           raise Error, ex.message
@@ -100,9 +99,9 @@ module RunKit
       def exit_fn(status, error: nil)
         args = [].tap do
           _1 << status
-          _1 << error if config.exit.arity == 2
+          _1 << error if root.exit.arity == 2
         end
-        config.exit.call(*args)
+        root.exit.call(*args)
         nil
       end
 
@@ -134,7 +133,7 @@ module RunKit
 
     # main entry point
     def self.parse(argv = ARGV)
-      Main.new.tap { yield _1.config if block_given? }.parse(argv)
+      Main.new.tap { yield _1.root if block_given? }.parse(argv)
     end
   end
 end

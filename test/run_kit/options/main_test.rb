@@ -5,10 +5,10 @@ module RunKit
     class MainTest < Minitest::Test
       def test_basic
         main = Main.new.tap do
-          _1.config.bool("-v", "--verbose")
-          _1.config.bool("--color", default: true)
-          _1.config.str("--name", default: "default")
-          _1.config.positional("<url>")
+          _1.root.bool("-v", "--verbose")
+          _1.root.bool("--color", default: true)
+          _1.root.str("--name", default: "default")
+          _1.root.positional("<url>")
         end
         options = main.parse([
           "-v", "--no-color", "--name", "Lee",
@@ -34,8 +34,8 @@ module RunKit
         status = nil
         output, = capture_io do
           Main.new.tap do
-            _1.config.app_name = "run-kit"
-            _1.config.exit = ->(value) { status = value }
+            _1.root.app_name = "run-kit"
+            _1.root.exit = ->(value) { status = value }
           end.parse(["--help"])
         end
         assert_equal 0, status
@@ -45,9 +45,9 @@ module RunKit
         status = nil
         output, = capture_io do
           Main.new.tap do
-            _1.config.app_name = "run-kit"
-            _1.config.version = "1.2.3"
-            _1.config.exit = ->(value) { status = value }
+            _1.root.app_name = "run-kit"
+            _1.root.version = "1.2.3"
+            _1.root.exit = ->(value) { status = value }
           end.parse(["--version"])
         end
         assert_equal 0, status
@@ -57,8 +57,8 @@ module RunKit
         status = nil
         output, = capture_io do
           Main.new.tap do
-            _1.config.app_name = "run-kit"
-            _1.config.exit = ->(value) { status = value }
+            _1.root.app_name = "run-kit"
+            _1.root.exit = ->(value) { status = value }
           end.parse([])
         end
         assert_equal 0, status
@@ -86,13 +86,13 @@ module RunKit
         ].each do |argv, expected|
           status = nil
           main = Main.new.tap do
-            _1.config.app_name = "run-kit"
-            _1.config.color = false
-            _1.config.version = "1.2.3"
-            _1.config.int("--count", env: "RUN_KIT_TEST_COUNT")
-            _1.config.str("--required", required: true)
-            _1.config.cmd("build") { |c| c.str("--token", required: true) }
-            _1.config.exit = ->(value) { status = value }
+            _1.root.app_name = "run-kit"
+            _1.root.color = false
+            _1.root.version = "1.2.3"
+            _1.root.int("--count", env: "RUN_KIT_TEST_COUNT")
+            _1.root.str("--required", required: true)
+            _1.root.cmd("build") { |c| c.str("--token", required: true) }
+            _1.root.exit = ->(value) { status = value }
           end
           output, stderr = capture_io { main.parse(argv) }
           assert_equal 0, status, argv.inspect
@@ -105,8 +105,8 @@ module RunKit
 
       def test_disabled_version
         main = Main.new.tap do
-          _1.config.version = false
-          _1.config.bool("-v", "--version")
+          _1.root.version = false
+          _1.root.bool("-v", "--version")
         end
         options = main.parse(["-v"])
         assert_equal true, options.version
@@ -116,9 +116,9 @@ module RunKit
         status = nil
         _, stderr = capture_io do
           cli = Main.new.tap do
-            _1.config.app_name = "run-kit"
-            _1.config.naked = false
-            _1.config.exit = ->(value, msg) { status = value }
+            _1.root.app_name = "run-kit"
+            _1.root.naked = false
+            _1.root.exit = ->(value, msg) { status = value }
           end
           cli.parse(["--unknown"])
         end
@@ -129,15 +129,15 @@ module RunKit
       def test_commands
         build = lambda do
           Main.new.tap do |m|
-            m.config.app_name = "myapp"
-            m.config.bool("-n", "--dry-run")
-            m.config.cmd("build", "Build the project") { |c| c.str("--target", default: "release") }
-            m.config.cmd("test") { |c| c.bool("--verbose") }
+            m.root.app_name = "myapp"
+            m.root.bool("-n", "--dry-run")
+            m.root.cmd("build", "Build the project") { |c| c.str("--target", default: "release") }
+            m.root.cmd("test") { |c| c.bool("--verbose") }
           end
         end
 
         # bare subcommand uses its defaults
-        options = build.call.tap { _1.config.commands["build"].naked = false }.parse(["build"])
+        options = build.call.tap { _1.root.commands["build"].naked = false }.parse(["build"])
         assert_equal({
           dry_run: false,
           target: "release",
@@ -159,7 +159,7 @@ module RunKit
         # subcommand's own help, not the top-level one
         status = nil
         output, = capture_io do
-          main = build.call.tap { _1.config.exit = ->(value, *) { status = value } }
+          main = build.call.tap { _1.root.exit = ->(value, *) { status = value } }
           main.parse(["build", "-h"])
         end
         assert_equal 0, status
@@ -171,7 +171,7 @@ module RunKit
         # bare commands show full help unless naked is disabled
         expected_help = output
         output, = capture_io do
-          build.call.tap { _1.config.exit = ->(value, *) { status = value } }.parse(["build"])
+          build.call.tap { _1.root.exit = ->(value, *) { status = value } }.parse(["build"])
         end
         assert_equal 0, status
         assert_equal expected_help, output
@@ -179,8 +179,8 @@ module RunKit
         # child version uses settings assigned after command declaration
         output, = capture_io do
           main = build.call.tap do
-            _1.config.version = "1.2.3"
-            _1.config.exit = ->(value, *) { status = value }
+            _1.root.version = "1.2.3"
+            _1.root.exit = ->(value, *) { status = value }
           end
           main.parse(["build", "--version"])
         end
@@ -189,7 +189,7 @@ module RunKit
 
         # top-level help lists commands
         output, = capture_io do
-          build.call.tap { _1.config.exit = ->(*) {} }.parse(["--help"])
+          build.call.tap { _1.root.exit = ->(*) {} }.parse(["--help"])
         end
         assert_includes output, "Commands:"
         assert_includes output, "build  Build the project"
@@ -197,7 +197,7 @@ module RunKit
         # unknown command
         status = nil
         _, stderr = capture_io do
-          main = build.call.tap { _1.config.exit = ->(value, *) { status = value } }
+          main = build.call.tap { _1.root.exit = ->(value, *) { status = value } }
           main.parse(["bogus"])
         end
         assert_equal 1, status
@@ -205,7 +205,7 @@ module RunKit
 
         # subcommand errors use the subcommand's context
         _, stderr = capture_io do
-          build.call.tap { _1.config.exit = ->(*) {} }.parse(["build", "--wat"])
+          build.call.tap { _1.root.exit = ->(*) {} }.parse(["build", "--wat"])
         end
         assert_includes stderr, "myapp build: unexpected argument '--wat' found"
         assert_includes stderr, "myapp build: try 'myapp build --help'"
@@ -215,8 +215,8 @@ module RunKit
         [nil, false, "ignored"].each do |value|
           seen = []
           main = Main.new.tap do
-            _1.config.int("--count", default: 1)
-            _1.config.validate = lambda do |options|
+            _1.root.int("--count", default: 1)
+            _1.root.validate = lambda do |options|
               seen << options
               value
             end
@@ -228,9 +228,9 @@ module RunKit
 
         seen = []
         main = Main.new.tap do |m|
-          m.config.bool("--force")
-          m.config.validate = ->(options) { seen << [:root, options] }
-          m.config.cmd("build") do |c|
+          m.root.bool("--force")
+          m.root.validate = ->(options) { seen << [:root, options] }
+          m.root.cmd("build") do |c|
             c.int("--count", default: 1)
             c.validate = ->(options) { seen << [:child, options] }
           end
@@ -247,10 +247,10 @@ module RunKit
           seen = []
           status = message = nil
           main = Main.new.tap do |m|
-            m.config.app_name = "myapp"
-            m.config.exit = ->(code, error) { status, message = code, error }
-            child = m.config.cmd("build") { _1.naked = false }
-            {root: m.config, child:}.each do |name, context|
+            m.root.app_name = "myapp"
+            m.root.exit = ->(code, error) { status, message = code, error }
+            child = m.root.cmd("build") { _1.naked = false }
+            {root: m.root, child:}.each do |name, context|
               context.validate = lambda do |_options|
                 seen << name
                 raise "invalid combination" if name == failing
@@ -266,8 +266,8 @@ module RunKit
         end
 
         main = Main.new.tap do
-          _1.config.naked = false
-          _1.config.validate = ->(options) { options.missing_method }
+          _1.root.naked = false
+          _1.root.validate = ->(options) { options.missing_method }
         end
         assert_raises(NoMethodError) { main.parse([]) }
       end
@@ -276,10 +276,10 @@ module RunKit
         [[], %w[--help], %w[--version], %w[--unknown], %w[build], %w[build --help], %w[build --unknown]].each do |argv|
           seen = []
           main = Main.new.tap do
-            _1.config.version = "1.2.3"
-            _1.config.exit = ->(*) {}
-            _1.config.validate = ->(options) { seen << options }
-            _1.config.cmd("build") { |c| c.validate = ->(options) { seen << options } }
+            _1.root.version = "1.2.3"
+            _1.root.exit = ->(*) {}
+            _1.root.validate = ->(options) { seen << options }
+            _1.root.cmd("build") { |c| c.validate = ->(options) { seen << options } }
           end
           capture_io { main.parse(argv) }
           assert_equal [], seen, argv.inspect
@@ -289,7 +289,7 @@ module RunKit
       def test_command_key
         ["--command", "<command>"].each do |declaration|
           main = Main.new.tap do |m|
-            m.config.cmd("run") do |c|
+            m.root.cmd("run") do |c|
               declaration.start_with?("--") ? c.str(declaration) : c.pos(declaration)
             end
           end

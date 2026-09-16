@@ -6,7 +6,7 @@
 module RunKit
   module Options
     class Config
-      attr_accessor :banner, :color, :desc, :exit, :help, :naked, :name, :parent, :validate, :version
+      attr_accessor :banner, :color, :desc, :exit, :help, :naked, :name, :root, :validate, :version
       attr_reader :help_flag, :version_flag
       alias_method :naked?, :naked
 
@@ -28,8 +28,7 @@ module RunKit
       def cmd(name, desc = nil)
         raise ArgumentError, "duplicate command #{name}" if commands.key?(name)
         Config.new(name:).tap do
-          _1.parent = self
-          _1.desc = desc
+          _1.desc, _1.root = desc, self
           yield _1 if block_given?
           raise ArgumentError, "nested commands are not supported" if _1.commands.any?
           commands[name] = _1
@@ -93,7 +92,7 @@ module RunKit
       # one-liners
       def flag(switch) = lookup[switch]
       def flag?(switch) = lookup.key?(switch)
-      def full_name = parent ? "#{parent.full_name} #{name}" : name
+      def full_name = root ? "#{root.full_name} #{name}" : name
       def key?(key) = lookup.key?(key)
       def naked_message = "#{full_name}: try '#{full_name} --help' for more information"
       def required = flags.select(&:required?)
@@ -111,8 +110,8 @@ module RunKit
         @prepared = true
 
         # Children inherit shared settings before adding builtins.
-        if parent
-          self.color, self.exit, self.version = parent.color, parent.exit, parent.version
+        if root
+          self.color, self.exit, self.version = root.color, root.exit, root.version
         end
 
         # now defaults
