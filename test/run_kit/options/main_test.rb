@@ -82,8 +82,8 @@ module RunKit
           [%w[build --token --help], "Usage: run-kit build"],
           [%w[--version], "run-kit 1.2.3"],
           [%w[--dry-run build --version], "run-kit 1.2.3"],
-          [%w[build -v], "run-kit build 1.2.3"],
-          [%w[build --version], "run-kit build 1.2.3"],
+          [%w[build -v], "run-kit 1.2.3"],
+          [%w[build --version], "run-kit 1.2.3"],
         ].each do |argv, expected|
           status = nil
           main = Main.new.tap do
@@ -183,7 +183,7 @@ module RunKit
           main.parse(["build", "--version"])
         end
         assert_equal 0, status
-        assert_equal "myapp build 1.2.3\n", output
+        assert_equal "myapp 1.2.3\n", output
 
         # top-level help lists commands
         output, = capture_io do

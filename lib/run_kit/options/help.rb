@@ -72,7 +72,7 @@ module RunKit
           label_width = config.commands.keys.map { Term.width(_1.to_s) }.max
           config.commands.each do |name, sub|
             buf << " " * INDENT << color.green(name.to_s)
-            if !sub.desc.to_s.empty?
+            if !sub.desc.empty?
               buf << " " * (label_width - Term.width(name.to_s) + 2)
               indent = INDENT + label_width + 2
               buf << Term.wrap(sub.desc, width - indent).gsub("\n", "\n#{" " * indent}")

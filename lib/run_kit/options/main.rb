@@ -31,11 +31,8 @@ module RunKit
       def parse(argv)
         config.prepare!
 
-        # Builtins win over parsing and validation, anywhere in argv.
-        if (output = builtin_output(argv))
-          puts output
-          return exit_fn(0)
-        end
+        # handle --help and --version
+        return exit_fn(0) if early_exit?(argv)
 
         begin
           options = config.commands.empty? ? parse0(config, argv) : subcommand(argv)
@@ -48,14 +45,17 @@ module RunKit
 
       protected
 
-      # The first builtin wins; only argv's first argument selects its command.
-      def builtin_output(argv)
-        cmd = config.commands[argv.first&.to_sym] || config
-        argv.each do |item|
-          return Help.new(cmd) if %w[--help -h].include?(item)
-          return "#{cmd.app_name} #{cmd.version}" if cmd.version && %w[--version -v].include?(item)
+      # Handle --help or --version
+      def early_exit?(argv)
+        if argv.include?("--help") || argv.include?("-h")
+          cmd = config.commands[argv.first&.to_sym] || config
+          puts Help.new(cmd)
+          return true
         end
-        nil
+        if config.version && (argv.include?("--version") || argv.include?("-v"))
+          puts "#{app_name} #{config.version}"
+          return true
+        end
       end
 
       # Internal parse, used for both main cmd and subcommands. Keep track of
