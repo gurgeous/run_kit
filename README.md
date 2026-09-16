@@ -135,7 +135,7 @@ Note: There has been some effort to get the Pathname helpers into Ruby itself, w
 #### unreleased
 
 - add subcommand support (`o.cmd`)
-- add custom option validation (`o.validate`)
+- add custom validation (`o.validate`)
 
 #### 0.1.3 (Sep 2026)
 

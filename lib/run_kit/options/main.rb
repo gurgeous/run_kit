@@ -85,7 +85,7 @@ module RunKit
         end
       end
 
-      # Render the outcome using the active parser or validator's config.
+      # Render the outcome using the active cmd.
       def handle_error(ex)
         if ex.is_a?(Error)
           warn "#{cmd.app_name}: #{ex.message}"
