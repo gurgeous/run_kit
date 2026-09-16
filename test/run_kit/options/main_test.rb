@@ -176,7 +176,7 @@ module RunKit
         assert_equal 0, status
         assert_equal expected_help, output
 
-        # child version uses settings assigned after command declaration
+        # subcommand --version prints the root version
         output, = capture_io do
           main = build.call.tap do
             _1.root.version = "1.2.3"
@@ -209,6 +209,18 @@ module RunKit
         end
         assert_includes stderr, "myapp build: unexpected argument '--wat' found"
         assert_includes stderr, "myapp build: try 'myapp build --help'"
+      end
+
+      def test_parse_context
+        main = Main.new.tap do
+          _1.root.exit = ->(*) {}
+          _1.root.cmd("build") { |c| c.naked = false }
+        end
+        main.parse(["build"])
+        assert_equal main.root.commands["build"], main.ctx
+
+        capture_io { main.parse(["--help"]) }
+        assert_equal main.root, main.ctx
       end
 
       def test_validation

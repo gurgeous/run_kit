@@ -13,7 +13,7 @@ module RunKit
       end
 
       # Reset transient state, parse argv, and assemble the result. When
-      # passthru is set, scanning halts at the first bare arg (for cmds).
+      # passthru is set, scanning halts at the first bare arg (for subcommands).
       def parse(argv, passthru: false)
         # 1. naked?
         raise NakedRequested if config.naked? && argv.empty?

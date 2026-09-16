@@ -64,7 +64,7 @@ module RunKit
         end.join("\n")
       end
 
-      # Build the usage line from the configured app name and positionals.
+      # Build the usage line from the command's full name and positionals.
       def banner
         text = config.banner
         text ||= [color.blue("Usage:"), color.green(config.full_name), "[options]"].tap do

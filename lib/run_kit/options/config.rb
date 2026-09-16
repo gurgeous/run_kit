@@ -94,7 +94,6 @@ module RunKit
       def flag?(switch) = lookup.key?(switch)
       def full_name = root ? "#{root.full_name} #{name}" : name
       def key?(key) = lookup.key?(key)
-      def naked_message = "#{full_name}: try '#{full_name} --help' for more information"
       def required = flags.select(&:required?)
 
       # memoized accessors

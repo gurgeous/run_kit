@@ -22,20 +22,21 @@
 module RunKit
   module Options
     class Main
-      # root is the top-level config; cmd is the active parser or validator's config.
-      attr_reader :cmd, :root
+      # root is the top-level config; ctx is the active parser or validator's config.
+      attr_reader :ctx, :root
 
       def initialize = @root = Config.new
 
       # Parse argv and turn internal parser outcomes into CLI behavior.
       def parse(argv)
+        @ctx = root
         root.prepare!
 
         # handle --help and --version
         return exit_fn(0) if early_exit?(argv)
 
         begin
-          options = root.commands.empty? ? parse_with_cmd(root, argv) : subcommand(argv)
+          options = root.commands.empty? ? parse_with_ctx(root, argv) : subcommand(argv)
           klass = Data.define(*options.keys)
           klass.new(**options).tap { validate(_1) }
         rescue Error, NakedRequested => ex
@@ -62,14 +63,14 @@ module RunKit
       # rest with its own Config and merge the two option hashes together.
       def subcommand(argv)
         # Parse root options before the subcommand.
-        root_options = parse_with_cmd(root, argv, passthru: true)
+        root_options = parse_with_ctx(root, argv, passthru: true)
         name, *rest = root_options[:_args]
         raise NakedRequested if !name
 
         # Find and parse the child.
         child = root.commands[name]
         raise Error, "unknown command '#{name}'" if !child
-        child_options = parse_with_cmd(child, rest)
+        child_options = parse_with_ctx(child, rest)
 
         # merge
         root_options.merge(child_options).merge(command: name)
@@ -77,22 +78,22 @@ module RunKit
 
       # Validate the final options, root first.
       def validate(options)
-        [cmd.root, cmd].compact.each do
-          validate_with_cmd(_1, options)
+        [ctx.root, ctx].compact.each do
+          validate_with_ctx(_1, options)
         rescue RuntimeError => ex
           raise Error, ex.message
         end
       end
 
-      # Render the outcome using the active cmd.
+      # Render the outcome using the active context.
       def handle_error(ex)
         if ex.is_a?(Error)
-          warn "#{cmd.full_name}: #{ex.message}"
-          warn cmd.naked_message
+          warn "#{ctx.full_name}: #{ex.message}"
+          warn "#{ctx.full_name}: try '#{ctx.full_name} --help' for more information"
           return exit_fn(1, error: ex.message)
         end
 
-        puts Help.new(cmd)
+        puts Help.new(ctx)
         exit_fn(0)
       end
 
@@ -110,20 +111,20 @@ module RunKit
       # This is error context, not a push/pop command stack.
       #
 
-      def with_cmd(cmd)
-        @cmd = cmd
+      def with_ctx(ctx)
+        @ctx = ctx
         yield
       end
 
-      def parse_with_cmd(cmd, argv, passthru: false)
-        with_cmd(cmd) do
-          Parser.new(cmd).parse(argv, passthru:)
+      def parse_with_ctx(ctx, argv, passthru: false)
+        with_ctx(ctx) do
+          Parser.new(ctx).parse(argv, passthru:)
         end
       end
 
-      def validate_with_cmd(cmd, options)
-        with_cmd(cmd) do
-          cmd.validate&.call(options)
+      def validate_with_ctx(ctx, options)
+        with_ctx(ctx) do
+          ctx.validate&.call(options)
         end
       end
     end
