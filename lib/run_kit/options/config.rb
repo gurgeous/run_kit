@@ -6,13 +6,17 @@
 module RunKit
   module Options
     class Config
-      attr_accessor :banner, :color, :desc, :exit, :help, :naked, :name, :root, :validate, :version
-      attr_reader :help_flag, :version_flag
+      attr_accessor :banner, :color, :desc, :exit, :help, :naked, :root, :validate, :version
+      attr_reader :help_flag, :name, :version_flag
       alias_method :naked?, :naked
 
       def initialize(name: nil)
         @naked = true
-        @name = name || File.basename($PROGRAM_NAME)
+        self.name = name || Shell.program_name
+      end
+
+      def name=(name)
+        @name = name.to_s
       end
 
       # Add a positional param declared as `<url>`.
@@ -26,6 +30,7 @@ module RunKit
 
       # Add a subcommand with its own nested Config, eg `myapp build`.
       def cmd(name, desc = nil)
+        name = name.to_s
         raise ArgumentError, "duplicate command #{name}" if commands.key?(name)
         Config.new(name:).tap do
           _1.desc, _1.root = desc, self

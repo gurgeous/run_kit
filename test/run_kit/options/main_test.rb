@@ -214,7 +214,7 @@ module RunKit
       def test_parse_context
         main = Main.new.tap do
           _1.root.exit = ->(*) {}
-          _1.root.cmd("build") { |c| c.naked = false }
+          _1.root.cmd(:build) { |c| c.naked = false }
         end
         main.parse(["build"])
         assert_equal main.root.commands["build"], main.ctx

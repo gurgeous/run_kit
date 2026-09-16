@@ -101,21 +101,21 @@ module RunKit
       end
 
       def test_full_name
-        named = Config.new(name: "custom")
+        named = Config.new(name: :custom)
         assert_equal "custom", named.name
         assert_equal "custom", named.full_name
 
         config = Config.new
         assert_equal File.basename($PROGRAM_NAME), config.name
-        child = config.cmd("build")
+        child = config.cmd(:build)
         assert_equal "build", child.name
         assert_equal "#{config.name} build", child.full_name
 
-        config.app_name = "myapp"
+        config.app_name = :myapp
         config.prepare!
         assert_equal "myapp build", child.full_name
 
-        config.app_name = "renamed"
+        config.name = :renamed
         assert_equal "renamed", config.name
         assert_equal "renamed build", child.full_name
       end
@@ -124,7 +124,7 @@ module RunKit
         assert_raises(ArgumentError) do
           Config.new.tap do |o|
             o.cmd("build") {}
-            o.cmd("build") {}
+            o.cmd(:build) {}
           end
         end
 
