@@ -99,13 +99,14 @@ module RunKit
       def required = flags.select(&:required?)
 
       # Complete one-time setup after the caller has declared overrides.
-      def prepare!(parent: nil)
+      def prepare!
         return if @prepared
         @prepared = true
         @exit ||= lambda { |status| Kernel.exit(status) }
         @help_flag = add_builtin(["-h", "--help"], "Show this message")
         @version_flag = add_builtin(["-v", "--version"], "Show version") if version
 
+        # prepare subcmds, mostly including copying things from parent
         commands.each do |name, cmd|
           cmd.app_name = "#{app_name} #{name}"
           cmd.color, cmd.exit, cmd.version = color, exit, version

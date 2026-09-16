@@ -42,7 +42,9 @@ module RunKit
 
       protected
 
-      # Internal parse, used for both main cmd and subcommands.
+      # Internal parse, used for both main cmd and subcommands. Keep track of
+      # which command we are parsing, so we can handle early exits and errors
+      # appropriately.
       def parse0(cmd, argv, passthru: false)
         @cmd = cmd
         Parser.new(cmd).parse(argv, passthru:)

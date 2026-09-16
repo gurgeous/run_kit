@@ -13,9 +13,7 @@ module RunKit
       end
 
       # Reset transient state, parse argv, and assemble the result. When
-      # passthru is set, flag scanning halts at the first bare argument, so a
-      # subcommand token (and everything after it, `-h` included) passes
-      # through untouched for a later parser to handle.
+      # passthru is set, scanning halts at the first bare arg (for cmds).
       def parse(argv, passthru: false)
         # 1. naked?
         raise NakedRequested if config.naked? && argv.empty?
