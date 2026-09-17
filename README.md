@@ -2,6 +2,8 @@
 
 RunKit is a small toolkit for cli. It provides option parsing, shell and file helpers, term colors, and a handful of core extensions.
 
+<img src="./logo.png" width="40%">
+
 ### Installation
 
 ```ruby
