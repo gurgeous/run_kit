@@ -58,6 +58,7 @@ module RunKit
         output, = capture_io do
           Main.new.tap do
             _1.root.app_name = "run-kit"
+            _1.root.naked = true
             _1.root.exit = ->(value) { status = value }
           end.parse([])
         end
@@ -137,7 +138,7 @@ module RunKit
         end
 
         # bare subcommand uses its defaults
-        options = build.call.tap { _1.root.commands["build"].naked = false }.parse(["build"])
+        options = build.call.parse(["build"])
         assert_equal({
           dry_run: false,
           target: "release",
@@ -168,10 +169,13 @@ module RunKit
         assert_includes output, "Other options:"
         assert_includes output, "--dry-run"
 
-        # bare commands show full help unless naked is disabled
+        # bare commands show full help when naked is enabled
         expected_help = output
         output, = capture_io do
-          build.call.tap { _1.root.exit = ->(value, *) { status = value } }.parse(["build"])
+          build.call.tap do
+            _1.root.commands["build"].naked = true
+            _1.root.exit = ->(value, *) { status = value }
+          end.parse(["build"])
         end
         assert_equal 0, status
         assert_equal expected_help, output
@@ -288,10 +292,14 @@ module RunKit
         [[], %w[--help], %w[--version], %w[--unknown], %w[build], %w[build --help], %w[build --unknown]].each do |argv|
           seen = []
           main = Main.new.tap do
+            _1.root.naked = true
             _1.root.version = "1.2.3"
             _1.root.exit = ->(*) {}
             _1.root.validate = ->(options) { seen << options }
-            _1.root.cmd("build") { |c| c.validate = ->(options) { seen << options } }
+            _1.root.cmd("build") do |c|
+              c.naked = true
+              c.validate = ->(options) { seen << options }
+            end
           end
           capture_io { main.parse(argv) }
           assert_equal [], seen, argv.inspect

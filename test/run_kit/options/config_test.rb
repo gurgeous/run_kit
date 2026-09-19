@@ -8,7 +8,6 @@ module RunKit
           _1.app_name = "fetch"
           _1.banner = "Fetch a URL"
           _1.color = false
-          _1.naked = false
           _1.version = "1.2.3"
           _1.sep("Options:")
           _1.bool("-q", "--quiet", "Suppress output")
@@ -19,6 +18,8 @@ module RunKit
           _1.sym("--mode", default: :fast, choices: %i[fast safe])
           _1.pos("<url>", "URL to fetch")
         end.tap(&:prepare!)
+
+        assert_equal false, config.naked?
 
         # flags
         assert_equal({
@@ -93,7 +94,7 @@ module RunKit
         assert_same config, build.root
         assert_equal "myapp build", build.full_name
         assert_equal "Build the project", build.desc
-        assert_true build.naked?
+        assert_equal false, build.naked?
         assert_equal false, build.color
         assert_equal config.exit, build.exit
         assert_equal "1.2.3", build.version

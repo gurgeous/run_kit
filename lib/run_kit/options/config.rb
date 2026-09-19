@@ -11,7 +11,7 @@ module RunKit
       alias_method :naked?, :naked
 
       def initialize(name: nil)
-        @naked = true
+        @naked = false
         self.name = name || Shell.program_name
       end
 

@@ -105,9 +105,6 @@ module RunKit
           _1.sym("--mode", choices: %i[fast slow], env: "RUN_KIT_TEST_MODE")
         end.tap(&:prepare!)
 
-        assert_raises(NakedRequested) { Parser.new(config).parse([]) }
-        config.naked = false
-
         assert_equal({
           force: true,
           ratio: 1.5,
@@ -118,6 +115,10 @@ module RunKit
           _args: [],
           force?: true,
         }, Parser.new(config).parse([]))
+
+        config.naked = true
+        assert_raises(NakedRequested) { Parser.new(config).parse([]) }
+        config.naked = false
 
         ENV["RUN_KIT_TEST_COUNT"] = "many"
         assert_raises(Error) { Parser.new(config).parse(["--count", "3"]) }
