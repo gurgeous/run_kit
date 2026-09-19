@@ -25,7 +25,7 @@ module RunKit
         options = {}.merge(config.defaults, parse_env, argv_options)
 
         # 4. validate final options
-        validate!(options)
+        validate!(options, naked: config.naked.nil? && argv.empty?)
 
         # success! add predicate? keys
         config.flags.select(&:bool?).map(&:key).each do
@@ -146,12 +146,17 @@ module RunKit
         end
       end
 
-      def validate!(options)
+      def validate!(options, naked: false)
+        # Infer help only for missing inputs, after ENV has been resolved.
         config.required.each do
-          raise Error, "required option '#{_1.switch}' is missing" if !options.key?(_1.key)
+          next if options.key?(_1.key)
+          raise NakedRequested if naked
+          raise Error, "required option '#{_1.switch}' is missing"
         end
         config.positionals.each do
-          raise Error, "required argument '#{_1.meta}' is missing" if !options[_1.key]
+          next if options[_1.key]
+          raise NakedRequested if naked
+          raise Error, "required argument '#{_1.meta}' is missing"
         end
       end
     end

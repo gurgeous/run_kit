@@ -19,7 +19,7 @@ module RunKit
           _1.pos("<url>", "URL to fetch")
         end.tap(&:prepare!)
 
-        assert_equal false, config.naked?
+        assert_nil config.naked?
 
         # flags
         assert_equal({
@@ -94,7 +94,7 @@ module RunKit
         assert_same config, build.root
         assert_equal "myapp build", build.full_name
         assert_equal "Build the project", build.desc
-        assert_equal false, build.naked?
+        assert_nil build.naked?
         assert_equal false, build.color
         assert_equal config.exit, build.exit
         assert_equal "1.2.3", build.version
