@@ -134,6 +134,10 @@ Note: There has been some effort to get the Pathname helpers into Ruby itself, w
 
 ### Changelog
 
+#### 0.1.5 (Sep 2026)
+
+- after some investigation, decided that naked should default to false
+
 #### 0.1.4 (Sep 2026)
 
 - add subcommand support (`o.cmd`)
