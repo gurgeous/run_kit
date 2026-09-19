@@ -134,6 +134,10 @@ Note: There has been some effort to get the Pathname helpers into Ruby itself, w
 
 ### Changelog
 
+#### (unreleased)
+
+- default `naked` to `nil`: show help on empty argv when required flags or positionals remain missing after ENV resolution; honor explicit `true`/`false`
+
 #### 0.1.5 (Sep 2026)
 
 - after some investigation, decided that naked should default to false

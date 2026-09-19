@@ -67,6 +67,61 @@ module RunKit
         assert_includes output, "--help"
       end
 
+      def test_inferred_naked
+        previous = ENV["RUN_KIT_TEST_FORCE"]
+        [
+          [nil, nil, [], 0],
+          [nil, "false", [], nil],
+          [nil, "invalid", [], 1],
+          [nil, nil, %w[--no-force], nil],
+          [nil, nil, %w[--other], 1],
+          [true, "false", [], 0],
+          [false, nil, [], 1],
+          [false, "false", [], nil],
+        ].each do |naked, env, argv, expected_status|
+          env ? ENV["RUN_KIT_TEST_FORCE"] = env : ENV.delete("RUN_KIT_TEST_FORCE")
+          [false, true].each do |child|
+            status = options = nil
+            main = Main.new.tap do |m|
+              m.root.exit = ->(value, *) { status = value }
+              config = child ? m.root.cmd("build") : m.root
+              config.naked = naked
+              config.bool("--force", required: true, env: "RUN_KIT_TEST_FORCE")
+              config.bool("--other")
+            end
+            output, stderr = capture_io { options = main.parse(child ? ["build", *argv] : argv) }
+            msg = [naked, env, argv, child].inspect
+            assert_equal expected_status, status, msg
+            if expected_status == 0
+              assert_includes output, "Usage:", msg
+              assert_equal "", stderr, msg
+            elsif expected_status == 1
+              assert_equal "", output, msg
+              assert_includes stderr, "try '", msg
+            else
+              assert_equal false, options.force?, msg
+              assert_equal "", output, msg
+              assert_equal "", stderr, msg
+            end
+          end
+        end
+
+        [nil, true, false].each do |naked|
+          status = nil
+          main = Main.new.tap do
+            _1.root.naked = naked
+            _1.root.pos("<url>")
+            _1.root.exit = ->(value, *) { status = value }
+          end
+          capture_io { main.parse([]) }
+          assert_equal((naked == false) ? 1 : 0, status)
+        end
+
+        assert_equal({_args: []}, Main.new.parse([]).to_h)
+      ensure
+        previous ? ENV["RUN_KIT_TEST_FORCE"] = previous : ENV.delete("RUN_KIT_TEST_FORCE")
+      end
+
       def test_builtin_scan
         previous = ENV["RUN_KIT_TEST_COUNT"]
         ENV["RUN_KIT_TEST_COUNT"] = "invalid"
