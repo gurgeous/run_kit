@@ -69,24 +69,17 @@ module RunKit
       end
 
       #
-      # -x or -x=123 or --xyz or --xyz=123 or --no-xyz
+      # -x or -x=123 or --xyz or --xyz=123
       #
 
       def parse_switch(item, match, queue)
         switch = "-#{match[1]}"
         param = match[2]
-        separator = param ? "=" : ""
 
         # -x or --xyz?
         if (flag = lookup[switch])
-          param = queue.shift if flag.takes_param? && separator.empty?
+          param = queue.shift if flag.takes_param? && !param
           return {flag.key => flag.parse(switch, param)}
-        end
-
-        # --no-xyz?
-        if (neg = find_negated_flag(switch))
-          raise Error, "option '#{item}' does not take a value" if separator == "="
-          return {neg.key => false}
         end
 
         raise Error, "unexpected argument '#{item}' found"
@@ -135,13 +128,6 @@ module RunKit
       #
       # helpers
       #
-
-      def find_negated_flag(switch)
-        if (m = Flag::NEGATE_RE.match(switch))
-          flag = lookup["--#{m[1]}"]
-          flag if flag&.bool?
-        end
-      end
 
       def validate!(options, infer_help: false)
         # Infer help only for missing inputs, after ENV has been resolved.

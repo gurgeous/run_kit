@@ -9,8 +9,6 @@ module RunKit
       SWITCH_RE = /\A-(\w|-\w[\w-]*)\z/
       # --foo=bar
       INLINE_RE = /\A-(\w|-\w[\w-]*)=(.*)\z/m
-      # --no-foo
-      NEGATE_RE = /\A--no-(\w[\w-]*)\z/
 
       TRUE_ENV = %w[1 true yes on]
       FALSE_ENV = ["", "0", "false", "no", "off"]

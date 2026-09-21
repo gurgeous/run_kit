@@ -6,12 +6,12 @@ module RunKit
       def test_basic
         main = Main.new.tap do
           _1.root.bool("-v", "--verbose")
-          _1.root.bool("--color", default: true)
+          _1.root.bool("--color")
           _1.root.str("--name", default: "default")
           _1.root.positional("<url>")
         end
         options = main.parse([
-          "-v", "--no-color", "--name", "Lee",
+          "-v", "--name", "Lee",
           "https://example.com",
         ])
 
@@ -73,7 +73,7 @@ module RunKit
           [nil, [], 0],
           ["false", [], nil],
           ["invalid", [], 1],
-          [nil, %w[--no-force], nil],
+          [nil, %w[--no-force], 1],
           [nil, %w[--other], 1],
         ].each do |env, argv, expected_status|
           env ? ENV["RUN_KIT_TEST_FORCE"] = env : ENV.delete("RUN_KIT_TEST_FORCE")
@@ -449,7 +449,6 @@ module RunKit
           [%w[--count=2 example.com], "fetch", "example.com", 2, false],
           [%w[-n2 example.com], "fetch", "example.com", 2, false],
           [%w[--dry-run --count 2 example.com], "fetch", "example.com", 2, true],
-          [%w[--no-dry-run example.com], "fetch", "example.com", 1, false],
           [%w[status --dry-run], "status", nil, nil, true],
           [%w[--dry-run status], "fetch", "status", 1, true],
         ].each do |argv, command, url, count, dry_run|

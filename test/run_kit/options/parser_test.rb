@@ -8,7 +8,7 @@ module RunKit
           "-vnLee",
           "--count=2",
           "--mode", "fast",
-          "--no-quiet",
+          "--quiet",
           "--output", "tmp/out",
           "source.txt",
         ]
@@ -31,18 +31,18 @@ module RunKit
           count: 2,
           ratio: 1.5,
           mode: :fast,
-          quiet: false,
+          quiet: true,
           output: Pathname("tmp/out"),
           source: "source.txt",
           _args: [],
           verbose?: true,
-          quiet?: false,
+          quiet?: true,
         }, options)
         assert_equal [
           "-vnLee",
           "--count=2",
           "--mode", "fast",
-          "--no-quiet",
+          "--quiet",
           "--output", "tmp/out",
           "source.txt",
         ], argv
@@ -119,9 +119,9 @@ module RunKit
         assert_raises(Error) { Parser.new(config).parse(["--count", "3"]) }
 
         ENV["RUN_KIT_TEST_COUNT"] = "2"
-        options = Parser.new(config).parse(["--no-force", "--count", "3"])
-        assert_equal false, options[:force]
-        assert_equal false, options[:force?]
+        options = Parser.new(config).parse(["--count", "3"])
+        assert_equal true, options[:force]
+        assert_equal true, options[:force?]
         assert_equal 3, options[:count]
       ensure
         previous&.each do |name, value|
@@ -148,7 +148,7 @@ module RunKit
         }, options)
 
         # `--` terminates parsing for both global and command flags.
-        options = Parser.new(child).parse(%w[--no-dry-run -- -n])
+        options = Parser.new(child).parse(%w[-- -n])
         assert_equal({
           dry_run: false,
           target: "release",
@@ -188,7 +188,6 @@ module RunKit
           ["unknown", ["--gub"], ->(o) { o.bool("--good") }],
           ["required", ["extra"], ->(o) { o.str("--name", required: true) }],
           ["missing positional", ["--"], ->(o) { o.pos("<url>") }],
-          ["non-boolean negation", ["--no-name"], ->(o) { o.str("--name") }],
           ["invalid smashed", ["-qz"], ->(o) { o.bool("-q") }],
         ].each do |msg, argv, configure|
           assert_raises(Error, msg) { parse_args(argv, &configure) }
