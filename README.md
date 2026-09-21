@@ -79,8 +79,9 @@ must have distinct switches and keys.
 | `jsonl_read` / `jsonl_write`   | Atomic read/write jsonl (add .gz for gzip)          |
 |                                |
 | `csv_write_stdout`             | Write CSV to stdout                                 |
-| `csv_write_to_s`               | Convert rows to CSV string                          |
+| `csv_write_to_s`               | Generate CSV string                                 |
 | `gunzip` / `gzip`              | (De)compress a string                               |
+|                                |
 | `atomic_write`                 | Atomically replace a file                           |
 | `cache_fetch`                  | Populate/fetch from file cache w/ block             |
 | `cp_metadata`                  | Copy file metadata from src to dst                  |
@@ -138,14 +139,18 @@ RunKit also installs a small set of core extensions to assist with bin scripts.
 
 Note: There has been some effort to get the Pathname helpers into Ruby itself, without much success.
 
+### Future Work
+
+- argv? ask nak for ideas
+
 ### Changelog
 
-#### (unreleased)
+#### 0.1.6 (Sep 2026)
 
-- add `csv_write_to_s` for CSV string output
-- default subcommands (`default: true`)
+- default subcommands with `default: true`
 - `<url...>` positionals for 1+ values
 - remove `naked` and just do the right thing
+- add `csv_write_to_s` for CSV string output
 
 #### 0.1.5 (Sep 2026)
 

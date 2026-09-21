@@ -33,6 +33,7 @@ module RunKit
 
       # Add a subcommand with its own nested Config, eg `myapp build`.
       def cmd(name, desc = nil, default: false)
+        check_inside!
         name = name.to_s
         raise ArgumentError, "duplicate command #{name}" if commands.key?(name)
         raise ArgumentError, "default command already set" if default && default_command
@@ -46,6 +47,7 @@ module RunKit
 
       # Add separator text at the current point in generated help.
       def sep(text = "")
+        check_inside!
         [flags.length, text].tap do
           separators << _1
         end
@@ -100,12 +102,8 @@ module RunKit
 
       # one-liners
       def default_command = commands.values.find(&:default?)
-      def flag(switch) = lookup[switch]
-      def flag?(switch) = lookup.key?(switch)
       def full_name = root ? "#{root.full_name} #{name}" : name
       def key?(key) = lookup.key?(key)
-      def neurotic? = required.any? || positionals.any?
-      def required = flags.select(&:required?)
 
       # memoized accessors
       def commands = @commands ||= {}
@@ -163,7 +161,7 @@ module RunKit
         raise ArgumentError, "reserved flag key: _args" if flag.key == :_args
         raise ArgumentError, "dup flag key: #{flag.key}" if key?(flag.key)
         flag.switches.each do
-          raise ArgumentError, "dup flag switch: #{_1}" if flag?(_1)
+          raise ArgumentError, "dup flag switch: #{_1}" if key?(_1)
         end
 
         # append

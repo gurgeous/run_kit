@@ -70,7 +70,11 @@ module RunKit
           infer_help = true
         end
         raise HelpRequested if !child && rest.empty?
-        raise Error, "unknown command '#{rest.first}'" if !child
+        if !child
+          switch = rest.first.start_with?("--") ? rest.first.split("=", 2).first : rest.first[0, 2]
+          raise Error, "global options must follow the command" if root.key?(switch)
+          raise Error, "unknown command '#{rest.first}'"
+        end
         parse_with_ctx(child, rest, infer_help:).merge(command: child.name)
       end
 

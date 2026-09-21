@@ -304,11 +304,14 @@ module RunKit
       def test_command_first
         main = Main.new.tap do
           _1.root.exit = ->(*) {}
-          _1.root.bool("--force")
+          _1.root.bool("-f", "--force")
+          _1.root.int("-n", "--count")
           _1.root.cmd("build")
         end
-        _, stderr = capture_io { assert_nil main.parse(%w[--force build]) }
-        assert_includes stderr, "unknown command '--force'"
+        %w[--force -f --count=2 -n2].each do |flag|
+          _, stderr = capture_io { assert_nil main.parse([flag, "build"]) }
+          assert_includes stderr, "global options must follow the command"
+        end
       end
 
       def test_extra_positionals

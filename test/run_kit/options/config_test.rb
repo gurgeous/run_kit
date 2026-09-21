@@ -19,8 +19,6 @@ module RunKit
           _1.pos("<url>", "URL to fetch")
         end.tap(&:prepare!)
 
-        assert_equal true, config.neurotic?
-
         # flags
         assert_equal({
           format: :str,
@@ -33,21 +31,20 @@ module RunKit
           version: :bool,
         }, config.flags.to_h { [_1.key, _1.kind] })
         assert_equal({quiet: false, timeout: 1.5, retries: 2, format: nil, mode: :fast}, config.defaults)
-        assert_equal [:output], config.required.map(&:key)
 
         # pos/sep
         assert_equal [[:url, "<url>", "URL to fetch"]], config.positionals.map { [_1.key, _1.meta, _1.help] }
         assert_equal [[0, "Options:"]], config.separators
 
         # lookups
-        assert_equal config.flag(:retries), config.flag("--retries")
-        assert_equal ["-r", "--retries"], config.flag(:retries).switches
-        assert_equal "count", config.flag(:retries).meta
-        assert_equal "Retry count", config.flag(:retries).help
+        assert_equal config.lookup[:retries], config.lookup["--retries"]
+        assert_equal ["-r", "--retries"], config.lookup[:retries].switches
+        assert_equal "count", config.lookup[:retries].meta
+        assert_equal "Retry count", config.lookup[:retries].help
 
         # builtins
-        assert_equal config.flag("--help"), config.help_flag
-        assert_equal config.flag("--version"), config.version_flag
+        assert_equal config.lookup["--help"], config.help_flag
+        assert_equal config.lookup["--version"], config.version_flag
       end
 
       def test_reserved_builtins
@@ -101,7 +98,6 @@ module RunKit
         assert_same config, build.root
         assert_equal "myapp build", build.full_name
         assert_equal "Build the project", build.desc
-        assert_equal false, build.neurotic?
         assert_equal false, build.color
         assert_equal config.exit, build.exit
         assert_equal "1.2.3", build.version
@@ -149,6 +145,22 @@ module RunKit
       end
 
       def test_command_scope
+        %i[cmd sep].each do |method|
+          config = Config.new
+          config.cmd("outer") do
+            assert_raises(ArgumentError) do
+              if method == :cmd
+                config.cmd("inner") {}
+              else
+                config.sep("inner")
+              end
+            end
+            assert_raises(ArgumentError) { config.bool("--leak") }
+          end
+          assert_equal ["outer"], config.commands.keys
+          assert_equal [], config.separators
+        end
+
         [[:bool, "--force", :force], [:pos, "<url>", :url]].each do |method, declaration, key|
           config = Config.new
           assert_raises(ArgumentError) do
