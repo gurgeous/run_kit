@@ -19,7 +19,7 @@ module RunKit
           _1.pos("<url>", "URL to fetch")
         end.tap(&:prepare!)
 
-        assert_nil config.naked?
+        assert_equal true, config.neurotic?
 
         # flags
         assert_equal({
@@ -94,7 +94,7 @@ module RunKit
         assert_same config, build.root
         assert_equal "myapp build", build.full_name
         assert_equal "Build the project", build.desc
-        assert_nil build.naked?
+        assert_equal false, build.neurotic?
         assert_equal false, build.color
         assert_equal config.exit, build.exit
         assert_equal "1.2.3", build.version
@@ -122,6 +122,13 @@ module RunKit
       end
 
       def test_invalid_commands
+        assert_raises(ArgumentError) do
+          Config.new.tap do
+            _1.cmd("fetch", default: true)
+            _1.cmd("build", default: true)
+          end
+        end
+
         assert_raises(ArgumentError) do
           Config.new.tap do |o|
             o.cmd("build") {}

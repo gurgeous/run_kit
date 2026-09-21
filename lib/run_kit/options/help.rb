@@ -76,10 +76,13 @@ module RunKit
 
       # Render the list of subcommands, aligned like the flag list above.
       def commands_text
+        commands = config.commands.map do |name, child|
+          [child.default? ? "#{name} (default)" : name, child]
+        end
         [].tap do |lines|
           lines << color.blue("Commands:")
-          label_width = config.commands.keys.map { Term.width(_1) }.max
-          config.commands.each do |name, child|
+          label_width = commands.map { Term.width(_1.first) }.max
+          commands.each do |name, child|
             lines << StringIO.new.tap do |buf|
               buf << " " * INDENT << color.green(name)
               if child.desc

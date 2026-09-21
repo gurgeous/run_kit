@@ -14,7 +14,6 @@ module RunKit
           "extra.txt",
         ]
         config = Config.new.tap do
-          _1.naked = false
           _1.bool("-v", "--verbose")
           _1.str("-n", "--name")
           _1.int("--count", choices: [1, 2])
@@ -116,10 +115,6 @@ module RunKit
           force?: true,
         }, Parser.new(config).parse([]))
 
-        config.naked = true
-        assert_raises(NakedRequested) { Parser.new(config).parse([]) }
-        config.naked = false
-
         ENV["RUN_KIT_TEST_COUNT"] = "many"
         assert_raises(Error) { Parser.new(config).parse(["--count", "3"]) }
 
@@ -138,7 +133,6 @@ module RunKit
         # flags before the first bare token are parsed normally; the token
         # and everything after (flag-shaped or not) passes through untouched
         config = Config.new.tap do
-          _1.naked = false
           _1.bool("-n", "--dry-run")
         end
         options = Parser.new(config).parse(["-n", "build", "-h", "--target", "debug"], passthru: true)
@@ -166,8 +160,8 @@ module RunKit
       def test_errors
         [
           ["unknown", ["--gub"], ->(o) { o.bool("--good") }],
-          ["required", [], ->(o) { o.str("--name", required: true) }],
-          ["missing positional", [], ->(o) { o.pos("<url>") }],
+          ["required", ["extra"], ->(o) { o.str("--name", required: true) }],
+          ["missing positional", ["--"], ->(o) { o.pos("<url>") }],
           ["non-boolean negation", ["--no-name"], ->(o) { o.str("--name") }],
           ["invalid smashed", ["-qz"], ->(o) { o.bool("-q") }],
         ].each do |msg, argv, configure|
@@ -179,7 +173,6 @@ module RunKit
 
       def parse_args(args)
         config = Config.new.tap do
-          _1.naked = false
           yield _1
         end
         Parser.new(config).parse(args)

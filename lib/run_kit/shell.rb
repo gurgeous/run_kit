@@ -78,6 +78,10 @@ module RunKit
       CSV($stdout) { _csv_write0(_1, rows, headers:) }
     end
 
+    def csv_write_to_s(rows, headers: nil)
+      CSV.generate { _csv_write0(_1, rows, headers:) }
+    end
+
     #
     # shell/shell!
     #

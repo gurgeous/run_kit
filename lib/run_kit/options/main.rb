@@ -39,7 +39,7 @@ module RunKit
           options = root.commands.empty? ? parse_with_ctx(root, argv) : subcommand(argv)
           klass = Data.define(*options.keys)
           klass.new(**options).tap { validate(_1) }
-        rescue Error, NakedRequested => ex
+        rescue Error, HelpRequested => ex
           handle_error(ex)
         end
       end
@@ -64,16 +64,22 @@ module RunKit
       def subcommand(argv)
         # Parse root options before the subcommand.
         root_options = parse_with_ctx(root, argv, passthru: true)
-        name, *rest = root_options[:_args]
-        raise NakedRequested if !name
+        rest = root_options[:_args]
 
         # Find and parse the child.
-        child = root.commands[name]
-        raise Error, "unknown command '#{name}'" if !child
-        child_options = parse_with_ctx(child, rest)
+        if (child = root.commands[rest.first])
+          rest = rest.drop(1)
+          infer_help = false
+        else
+          child = root.default_command
+          infer_help = true
+        end
+        raise HelpRequested if !child && rest.empty?
+        raise Error, "unknown command '#{rest.first}'" if !child
+        child_options = parse_with_ctx(child, rest, infer_help:)
 
         # merge
-        root_options.merge(child_options).merge(command: name)
+        root_options.merge(child_options).merge(command: child.name)
       end
 
       # Validate the final options, root first.
@@ -116,9 +122,9 @@ module RunKit
         yield
       end
 
-      def parse_with_ctx(ctx, argv, passthru: false)
+      def parse_with_ctx(ctx, argv, passthru: false, infer_help: true)
         with_ctx(ctx) do
-          Parser.new(ctx).parse(argv, passthru:)
+          Parser.new(ctx).parse(argv, passthru:, infer_help:)
         end
       end
 
@@ -130,7 +136,7 @@ module RunKit
     end
 
     class Error < StandardError; end
-    class NakedRequested < Exception; end # rubocop:disable Lint/InheritException
+    class HelpRequested < Exception; end # rubocop:disable Lint/InheritException
 
     # main entry point
     def self.parse(argv = ARGV)

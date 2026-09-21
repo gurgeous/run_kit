@@ -13,7 +13,9 @@ module RunKit
         @help, @meta = help, meta
         raise ArgumentError, "positional help must be a string" unless help.is_a?(String)
         raise ArgumentError, "positional meta must be a string" unless meta.is_a?(String)
-        raise ArgumentError, "positional must use <meta>" unless POSITIONAL_RE.match?(meta)
+        unless POSITIONAL_RE.match?(meta)
+          raise ArgumentError, "invalid positional #{meta.inspect}; wrap the argument name in angle brackets, e.g. o.pos(\"<url>\", \"URL to fetch\")"
+        end
       end
 
       # one-liners

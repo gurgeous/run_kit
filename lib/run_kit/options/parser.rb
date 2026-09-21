@@ -14,18 +14,15 @@ module RunKit
 
       # Reset transient state, parse argv, and assemble the result. When
       # passthru is set, scanning halts at the first bare arg (for subcommands).
-      def parse(argv, passthru: false)
-        # 1. naked?
-        raise NakedRequested if config.naked? && argv.empty?
-
-        # 2. Parse argv.
+      def parse(argv, passthru: false, infer_help: true)
+        # 1. Parse argv.
         argv_options = parse_argv(argv, passthru:)
 
-        # 3. defaults => ENV => ARGV
+        # 2. defaults => ENV => ARGV
         options = {}.merge(config.defaults, parse_env, argv_options)
 
-        # 4. validate final options
-        validate!(options, naked: config.naked.nil? && argv.empty?)
+        # 3. Validate requirements after ENV resolution; bare missing inputs show help.
+        validate!(options, infer_help: infer_help && argv.empty?)
 
         # success! add predicate? keys
         config.flags.select(&:bool?).map(&:key).each do
@@ -49,6 +46,14 @@ module RunKit
           # process argv as queue
           queue = argv.dup
           while (item = queue.shift)
+            # An unknown root switch starts the default command's arguments.
+            if passthru && config.default_command && item.start_with?("-") && item != "--"
+              switch = item.start_with?("--") ? item.split("=", 2).first : item[0, 2]
+              if !config.flag?(switch) && !find_negated_flag(switch)
+                break operands.concat([item, *queue])
+              end
+            end
+
             case item
             when Flag::SWITCH_RE, Flag::INLINE_RE then result.merge!(parse_switch(item, Regexp.last_match, queue))
             when /\A-[^-]/ then result.merge!(parse_smashed(item, queue))
@@ -146,16 +151,16 @@ module RunKit
         end
       end
 
-      def validate!(options, naked: false)
+      def validate!(options, infer_help: false)
         # Infer help only for missing inputs, after ENV has been resolved.
         config.required.each do
           next if options.key?(_1.key)
-          raise NakedRequested if naked
+          raise HelpRequested if infer_help
           raise Error, "required option '#{_1.switch}' is missing"
         end
         config.positionals.each do
           next if options[_1.key]
-          raise NakedRequested if naked
+          raise HelpRequested if infer_help
           raise Error, "required argument '#{_1.meta}' is missing"
         end
       end

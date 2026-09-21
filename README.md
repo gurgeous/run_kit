@@ -74,6 +74,7 @@ end
 | `jsonl_read` / `jsonl_write`   | Atomic read/write jsonl (add .gz for gzip)          |
 |                                |
 | `csv_write_stdout`             | Write CSV to stdout                                 |
+| `csv_write_to_s`               | Convert rows to CSV string                          |
 | `gunzip` / `gzip`              | (De)compress a string                               |
 | `atomic_write`                 | Atomically replace a file                           |
 | `cache_fetch`                  | Populate/fetch from file cache w/ block             |
@@ -136,7 +137,9 @@ Note: There has been some effort to get the Pathname helpers into Ruby itself, w
 
 #### (unreleased)
 
-- default `naked` to `nil`: show help on empty argv when required flags or positionals remain missing after ENV resolution; honor explicit `true`/`false`
+- add `csv_write_to_s` for CSV string output
+- default subcommands (`default: true`)
+- remove `naked` and just try to do the right thing
 
 #### 0.1.5 (Sep 2026)
 

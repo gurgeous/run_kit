@@ -18,6 +18,11 @@ module RunKit
           assert_raises(ArgumentError, kwargs.inspect) { Positional.new(**kwargs) }
         end
       end
+
+      def test_invalid_syntax_message
+        error = assert_raises(ArgumentError) { Positional.new(meta: "url", help: "") }
+        assert_equal 'invalid positional "url"; wrap the argument name in angle brackets, e.g. o.pos("<url>", "URL to fetch")', error.message
+      end
     end
   end
 end

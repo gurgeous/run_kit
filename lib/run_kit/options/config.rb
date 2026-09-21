@@ -6,12 +6,11 @@
 module RunKit
   module Options
     class Config
-      attr_accessor :banner, :color, :desc, :exit, :help, :naked, :root, :validate, :version
-      attr_reader :help_flag, :name, :version_flag
-      alias_method :naked?, :naked
+      attr_accessor :banner, :color, :default, :desc, :exit, :help, :root, :validate, :version
+      attr_reader(*%i[help_flag name version_flag])
+      alias_method :default?, :default
 
       def initialize(name: nil)
-        @naked = nil
         self.name = name || Shell.program_name
       end
 
@@ -29,11 +28,12 @@ module RunKit
       end
 
       # Add a subcommand with its own nested Config, eg `myapp build`.
-      def cmd(name, desc = nil)
+      def cmd(name, desc = nil, default: false)
         name = name.to_s
         raise ArgumentError, "duplicate command #{name}" if commands.key?(name)
+        raise ArgumentError, "default command already set" if default && default_command
         Config.new(name:).tap do
-          _1.desc, _1.root = desc, self
+          _1.default, _1.desc, _1.root = default, desc, self
           yield _1 if block_given?
           raise ArgumentError, "nested commands are not supported" if _1.commands.any?
           commands[name] = _1
@@ -95,10 +95,12 @@ module RunKit
       end
 
       # one-liners
+      def default_command = commands.values.find(&:default?)
       def flag(switch) = lookup[switch]
       def flag?(switch) = lookup.key?(switch)
       def full_name = root ? "#{root.full_name} #{name}" : name
       def key?(key) = lookup.key?(key)
+      def neurotic? = required.any? || positionals.any?
       def required = flags.select(&:required?)
 
       # memoized accessors
