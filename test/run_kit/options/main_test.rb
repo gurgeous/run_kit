@@ -12,7 +12,7 @@ module RunKit
         end
         options = main.parse([
           "-v", "--no-color", "--name", "Lee",
-          "https://example.com", "one", "two",
+          "https://example.com",
         ])
 
         assert_equal({
@@ -20,7 +20,7 @@ module RunKit
           name: "Lee",
           url: "https://example.com",
           verbose: true,
-          _args: %w[one two],
+          _args: [],
           verbose?: true,
           color?: false,
         }, options.to_h)
@@ -309,6 +309,21 @@ module RunKit
         end
         _, stderr = capture_io { assert_nil main.parse(%w[--force build]) }
         assert_includes stderr, "unknown command '--force'"
+      end
+
+      def test_extra_positionals
+        %i[root explicit default].each do |mode|
+          main = Main.new.tap do
+            _1.root.exit = ->(*) {}
+            config = (mode == :root) ? _1.root : _1.root.cmd("fetch", default: mode == :default)
+            config.pos("<url>")
+          end
+          [%w[example.com extra], %w[example.com -- extra]].each do |args|
+            argv = (mode == :explicit) ? ["fetch", *args] : args
+            _, stderr = capture_io { assert_nil main.parse(argv) }
+            assert_includes stderr, "unexpected argument 'extra' found", "#{mode}: #{argv.inspect}"
+          end
+        end
       end
 
       def test_command_env

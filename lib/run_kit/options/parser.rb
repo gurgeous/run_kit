@@ -42,7 +42,7 @@ module RunKit
       def parse_argv(argv)
         {}.tap do |result|
           # any non-flags we find below
-          operands = []
+          args = []
 
           # process argv as queue
           queue = argv.dup
@@ -51,17 +51,20 @@ module RunKit
             when Flag::SWITCH_RE, Flag::INLINE_RE then result.merge!(parse_switch(item, Regexp.last_match, queue))
             when /\A-[^-]/ then result.merge!(parse_smashed(item, queue))
             when "", /\A[^-]/
-              operands << item
-            when "--" then break operands.concat(queue)
+              args << item
+            when "--" then break args.concat(queue)
             else; raise Error, "unexpected argument '#{item}' found"
             end
           end
 
           # positionals
-          config.positionals.each { result[_1.key] = operands.shift }
+          config.positionals.each { result[_1.key] = _1.variadic? ? args.shift(args.length) : args.shift }
+          if config.positionals.any? && args.any?
+            raise Error, "unexpected argument '#{args.first}' found"
+          end
 
           # _args
-          result[:_args] = operands
+          result[:_args] = args
         end
       end
 
@@ -148,7 +151,7 @@ module RunKit
           raise Error, "required option '#{_1.switch}' is missing"
         end
         config.positionals.each do
-          next if options[_1.key]
+          next if _1.variadic? ? options[_1.key].any? : options[_1.key]
           raise HelpRequested if infer_help
           raise Error, "required argument '#{_1.meta}' is missing"
         end

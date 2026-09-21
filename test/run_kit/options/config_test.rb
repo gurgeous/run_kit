@@ -77,6 +77,13 @@ module RunKit
         end
       end
 
+      def test_variadic_positionals
+        config = Config.new.tap { _1.pos("<url...>") }
+        %w[<output> <files...>].each do |meta|
+          assert_raises(ArgumentError) { config.pos(meta) }
+        end
+      end
+
       def test_commands
         config = Config.new.tap do |o|
           o.bool("-n", "--dry-run")

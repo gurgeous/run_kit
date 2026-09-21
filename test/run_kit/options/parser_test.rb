@@ -11,7 +11,6 @@ module RunKit
           "--no-quiet",
           "--output", "tmp/out",
           "source.txt",
-          "extra.txt",
         ]
         config = Config.new.tap do
           _1.bool("-v", "--verbose")
@@ -35,7 +34,7 @@ module RunKit
           quiet: false,
           output: Pathname("tmp/out"),
           source: "source.txt",
-          _args: ["extra.txt"],
+          _args: [],
           verbose?: true,
           quiet?: false,
         }, options)
@@ -46,11 +45,12 @@ module RunKit
           "--no-quiet",
           "--output", "tmp/out",
           "source.txt",
-          "extra.txt",
         ], argv
       end
 
       def test_forms
+        assert_equal({_args: %w[one two]}, parse_args(%w[one two]) {})
+
         argv = ["--name=Lee=Smith", "--", "--verbose"]
         options = parse_args(argv) do
           _1.str("--name")
@@ -138,24 +138,49 @@ module RunKit
           _1.pos("<file>")
         end
         config.prepare!
-        options = Parser.new(child).parse(%w[-ntdebug input extra])
+        options = Parser.new(child).parse(%w[-ntdebug input])
         assert_equal({
           dry_run: true,
           target: "debug",
           file: "input",
-          _args: ["extra"],
+          _args: [],
           dry_run?: true,
         }, options)
 
         # `--` terminates parsing for both global and command flags.
-        options = Parser.new(child).parse(%w[--no-dry-run -- -n -t])
+        options = Parser.new(child).parse(%w[--no-dry-run -- -n])
         assert_equal({
           dry_run: false,
           target: "release",
           file: "-n",
-          _args: ["-t"],
+          _args: [],
           dry_run?: false,
         }, options)
+      end
+
+      def test_variadic_positionals
+        config = Config.new.tap do
+          _1.bool("--force")
+          _1.pos("<output>")
+          _1.pos("<url...>")
+        end
+        [
+          [%w[out one], ["one"], false],
+          [%w[out one --force two], %w[one two], true],
+          [%w[out -- --force two], %w[--force two], false],
+        ].each do |argv, urls, force|
+          options = Parser.new(config).parse(argv)
+          assert_equal "out", options[:output], argv.inspect
+          assert_equal urls, options[:url], argv.inspect
+          assert_equal force, options[:force], argv.inspect
+          assert_equal [], options[:_args], argv.inspect
+        end
+        error = assert_raises(Error) { Parser.new(config).parse(["out"]) }
+        assert_equal "required argument '<url...>' is missing", error.message
+
+        config = Config.new.tap { _1.pos("<url...>") }
+        assert_raises(Error) { Parser.new(config).parse([], infer_help: false) }
+        assert_raises(HelpRequested) { Parser.new(config).parse([]) }
       end
 
       def test_errors

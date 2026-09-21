@@ -1,11 +1,11 @@
 #
-# A required positional param like `<url>`.
+# A required positional param like `<url>` or `<url...>`.
 #
 
 module RunKit
   module Options
     class Positional
-      POSITIONAL_RE = /\A<([A-Z]\w*)>\z/i
+      POSITIONAL_RE = /\A<([A-Z]\w*)(\.\.\.)?>\z/i
 
       attr_reader :help, :meta
 
@@ -20,6 +20,7 @@ module RunKit
 
       # one-liners
       def key = @key ||= POSITIONAL_RE.match(meta)[1].to_sym
+      def variadic? = meta.end_with?("...>")
     end
   end
 end

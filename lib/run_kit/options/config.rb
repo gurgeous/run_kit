@@ -20,6 +20,9 @@ module RunKit
 
       # Add a positional param declared as `<url>`.
       def pos(meta, help = "")
+        if positionals.last&.variadic?
+          raise ArgumentError, "no positional arguments are allowed after #{positionals.last.meta}"
+        end
         Positional.new(meta:, help:).tap do
           raise ArgumentError, "duplicate positional #{_1.key}" if key?(_1.key)
           positionals << _1
