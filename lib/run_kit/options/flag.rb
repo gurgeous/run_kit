@@ -30,6 +30,7 @@ module RunKit
 
         # Extract meta from the final switch, if written as `--port <int>`.
         @meta = build_meta
+        validate_switches!
         @env = (env == true) ? key.to_s.upcase : env
 
         # default, with some special handling for bool
@@ -39,6 +40,13 @@ module RunKit
         end
 
         validate
+      rescue ArgumentError => ex
+        settings = {default:, required:, choices:, env:}.compact
+        settings.delete(:required) if required == false
+        settings = settings.map { "#{_1}: #{_2.inspect}" }.join(", ")
+        context = "opt.#{kind} #{opts.inspect}"
+        context = "#{context} (#{settings})" unless settings.empty?
+        raise ArgumentError, "#{context}: #{ex.message}", cause: nil
       end
 
       #
@@ -83,15 +91,16 @@ module RunKit
       # validation
       #
 
-      def validate
-        # switches
-        raise ArgumentError, "at least one switch is required" if switches.empty?
+      def validate_switches!
         switches.each do
           raise ArgumentError, "invalid switch: #{_1}" unless _1.is_a?(String)
           raise ArgumentError, "invalid switch: #{_1}" unless _1.match?(SWITCH_RE)
         end
+        raise ArgumentError, 'flag must start with "-" or "--"' if switches.empty?
         raise ArgumentError, "duplicate switch" unless switches.uniq.length == switches.length
+      end
 
+      def validate
         # params
         raise ArgumentError, "invalid flag kind: #{kind}" unless KINDS.include?(kind)
         raise ArgumentError, "boolean flags do not accept meta" if bool? && meta

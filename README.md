@@ -144,7 +144,8 @@ Note: There has been some effort to get the Pathname helpers into Ruby itself, w
 
 - add `csv_write_to_s` for CSV string output
 - default subcommands (`default: true`)
-- remove `naked` and just try to do the right thing
+- `<url...>` positionals for 1+ values
+- remove `naked` and just do the right thing
 
 #### 0.1.5 (Sep 2026)
 
