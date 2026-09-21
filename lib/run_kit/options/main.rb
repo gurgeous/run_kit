@@ -39,7 +39,7 @@ module RunKit
           options = root.commands.empty? ? parse_with_ctx(root, argv) : subcommand(argv)
           klass = Data.define(*options.keys)
           klass.new(**options).tap { validate(_1) }
-        rescue Error, NakedRequested => ex
+        rescue Error, HelpRequested => ex
           handle_error(ex)
         end
       end
@@ -59,21 +59,23 @@ module RunKit
         end
       end
 
-      # Peek at the first bare argument to pick a subcommand, then parse the
-      # rest with its own Config and merge the two option hashes together.
+      # Select from the first argument, then parse global and command flags together.
       def subcommand(argv)
-        # Parse root options before the subcommand.
-        root_options = parse_with_ctx(root, argv, passthru: true)
-        name, *rest = root_options[:_args]
-        raise NakedRequested if !name
-
-        # Find and parse the child.
-        child = root.commands[name]
-        raise Error, "unknown command '#{name}'" if !child
-        child_options = parse_with_ctx(child, rest)
-
-        # merge
-        root_options.merge(child_options).merge(command: name)
+        rest = argv
+        if (child = root.commands[rest.first])
+          rest = rest.drop(1)
+          infer_help = false
+        else
+          child = root.default_command
+          infer_help = true
+        end
+        raise HelpRequested if !child && rest.empty?
+        if !child
+          switch = rest.first.start_with?("--") ? rest.first.split("=", 2).first : rest.first[0, 2]
+          raise Error, "global options must follow the command" if root.key?(switch)
+          raise Error, "unknown command '#{rest.first}'"
+        end
+        parse_with_ctx(child, rest, infer_help:).merge(command: child.name)
       end
 
       # Validate the final options, root first.
@@ -93,7 +95,8 @@ module RunKit
           return exit_fn(1, error: ex.message)
         end
 
-        puts Help.new(ctx)
+        # Inferred help on a bare invocation introduces the whole app.
+        puts Help.new(root)
         exit_fn(0)
       end
 
@@ -116,9 +119,9 @@ module RunKit
         yield
       end
 
-      def parse_with_ctx(ctx, argv, passthru: false)
+      def parse_with_ctx(ctx, argv, infer_help: true)
         with_ctx(ctx) do
-          Parser.new(ctx).parse(argv, passthru:)
+          Parser.new(ctx).parse(argv, infer_help:)
         end
       end
 
@@ -130,7 +133,7 @@ module RunKit
     end
 
     class Error < StandardError; end
-    class NakedRequested < Exception; end # rubocop:disable Lint/InheritException
+    class HelpRequested < Exception; end # rubocop:disable Lint/InheritException
 
     # main entry point
     def self.parse(argv = ARGV)

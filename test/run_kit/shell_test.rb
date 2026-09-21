@@ -98,6 +98,13 @@ module RunKit
       $stdout = stdout
     end
 
+    def test_csv_write_to_s
+      rows = [{name: "rails, ruby", stars: 1}, {name: 'say "hi"', stars: nil}]
+      assert_equal "name,stars\n\"rails, ruby\",1\n\"say \"\"hi\"\"\",\n", Shell.csv_write_to_s(rows)
+      assert_equal "stars,name\n1,\"rails, ruby\"\n,\"say \"\"hi\"\"\"\n", Shell.csv_write_to_s(rows, headers: %i[stars name])
+      assert_equal "name,stars\n", Shell.csv_write_to_s([], headers: %i[name stars])
+    end
+
     def test_shell
       cases = [
         ["varargs", ["printf", "%s", "hi"]],

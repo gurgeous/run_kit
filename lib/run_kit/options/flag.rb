@@ -9,8 +9,6 @@ module RunKit
       SWITCH_RE = /\A-(\w|-\w[\w-]*)\z/
       # --foo=bar
       INLINE_RE = /\A-(\w|-\w[\w-]*)=(.*)\z/m
-      # --no-foo
-      NEGATE_RE = /\A--no-(\w[\w-]*)\z/
 
       TRUE_ENV = %w[1 true yes on]
       FALSE_ENV = ["", "0", "false", "no", "off"]
@@ -30,6 +28,7 @@ module RunKit
 
         # Extract meta from the final switch, if written as `--port <int>`.
         @meta = build_meta
+        validate_switches!
         @env = (env == true) ? key.to_s.upcase : env
 
         # default, with some special handling for bool
@@ -39,6 +38,9 @@ module RunKit
         end
 
         validate
+      rescue ArgumentError => ex
+        ctx = reconstruct(kind, opts, default:, required:, choices:, env:)
+        raise ArgumentError, "#{ctx} - #{ex.message}", cause: nil
       end
 
       #
@@ -83,15 +85,16 @@ module RunKit
       # validation
       #
 
-      def validate
-        # switches
-        raise ArgumentError, "at least one switch is required" if switches.empty?
+      def validate_switches!
         switches.each do
           raise ArgumentError, "invalid switch: #{_1}" unless _1.is_a?(String)
           raise ArgumentError, "invalid switch: #{_1}" unless _1.match?(SWITCH_RE)
         end
+        raise ArgumentError, 'flag must start with "-" or "--"' if switches.empty?
         raise ArgumentError, "duplicate switch" unless switches.uniq.length == switches.length
+      end
 
+      def validate
         # params
         raise ArgumentError, "invalid flag kind: #{kind}" unless KINDS.include?(kind)
         raise ArgumentError, "boolean flags do not accept meta" if bool? && meta
@@ -113,6 +116,12 @@ module RunKit
       #
       # helpers
       #
+
+      # Use the original declaration, before metadata and ENV normalization.
+      def reconstruct(kind, opts, **settings)
+        args = opts.map(&:inspect) + settings.filter_map { "#{_1}: #{_2.inspect}" if _2 }
+        ["opt.#{kind}", args.join(", ")].reject(&:empty?).join(" ")
+      end
 
       def build_meta
         # Only the final spelling may carry an inferred `<meta>`.

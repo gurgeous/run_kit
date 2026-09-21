@@ -6,12 +6,11 @@
 module RunKit
   module Options
     class Config
-      attr_accessor :banner, :color, :desc, :exit, :help, :naked, :root, :validate, :version
-      attr_reader :help_flag, :name, :version_flag
-      alias_method :naked?, :naked
+      attr_accessor :banner, :color, :default, :desc, :exit, :help, :root, :validate, :version
+      attr_reader(*%i[help_flag name version_flag])
+      alias_method :default?, :default
 
       def initialize(name: nil)
-        @naked = nil
         self.name = name || Shell.program_name
       end
 
@@ -21,6 +20,10 @@ module RunKit
 
       # Add a positional param declared as `<url>`.
       def pos(meta, help = "")
+        check_inside!
+        if positionals.last&.variadic?
+          raise ArgumentError, "no positional arguments are allowed after #{positionals.last.meta}"
+        end
         Positional.new(meta:, help:).tap do
           raise ArgumentError, "duplicate positional #{_1.key}" if key?(_1.key)
           positionals << _1
@@ -29,19 +32,22 @@ module RunKit
       end
 
       # Add a subcommand with its own nested Config, eg `myapp build`.
-      def cmd(name, desc = nil)
+      def cmd(name, desc = nil, default: false)
+        check_inside!
         name = name.to_s
         raise ArgumentError, "duplicate command #{name}" if commands.key?(name)
-        Config.new(name:).tap do
-          _1.desc, _1.root = desc, self
-          yield _1 if block_given?
-          raise ArgumentError, "nested commands are not supported" if _1.commands.any?
-          commands[name] = _1
+        raise ArgumentError, "default command already set" if default && default_command
+        Config.new(name:).tap do |child|
+          child.default, child.desc, child.root = default, desc, self
+          with_inside(name) { yield child } if block_given?
+          raise ArgumentError, "nested commands are not supported" if child.commands.any?
+          commands[name] = child
         end
       end
 
       # Add separator text at the current point in generated help.
       def sep(text = "")
+        check_inside!
         [flags.length, text].tap do
           separators << _1
         end
@@ -95,11 +101,9 @@ module RunKit
       end
 
       # one-liners
-      def flag(switch) = lookup[switch]
-      def flag?(switch) = lookup.key?(switch)
+      def default_command = commands.values.find(&:default?)
       def full_name = root ? "#{root.full_name} #{name}" : name
       def key?(key) = lookup.key?(key)
-      def required = flags.select(&:required?)
 
       # memoized accessors
       def commands = @commands ||= {}
@@ -111,6 +115,9 @@ module RunKit
       # Complete one-time setup after the caller has declared overrides.
       def prepare!
         return if @prepared
+        if commands.any? && positionals.any?
+          raise ArgumentError, "a command with subcommands cannot also take positional arguments; add them to a subcommand instead"
+        end
         @prepared = true
 
         # Children inherit shared settings before adding builtins.
@@ -123,18 +130,38 @@ module RunKit
         @help_flag = bool("-h", "--help", "Show this message")
         @version_flag = bool("-v", "--version", "Show version") if version
 
+        # Global and command flags share one parser; only builtins may overlap.
+        if root
+          keys = lookup.keys - [help_flag, version_flag].compact.flat_map { [_1.key, *_1.switches] }
+          collisions = keys & root.lookup.keys
+          raise ArgumentError, "command #{name} conflicts with global options: #{collisions.join(", ")}" if collisions.any?
+        end
+
         # setup subcommands
         commands.each_value(&:prepare!)
       end
 
       protected
 
+      # Catch accidental use of the outer config while defining a command.
+      def with_inside(name)
+        @inside = name
+        yield
+      ensure
+        @inside = nil
+      end
+
+      def check_inside!
+        raise ArgumentError, "you're adding a root option inside #{@inside.inspect} command" if @inside
+      end
+
       def add_flag(flag)
+        check_inside!
         # dup check
         raise ArgumentError, "reserved flag key: _args" if flag.key == :_args
         raise ArgumentError, "dup flag key: #{flag.key}" if key?(flag.key)
         flag.switches.each do
-          raise ArgumentError, "dup flag switch: #{_1}" if flag?(_1)
+          raise ArgumentError, "dup flag switch: #{_1}" if key?(_1)
         end
 
         # append

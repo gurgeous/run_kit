@@ -19,8 +19,6 @@ module RunKit
           _1.pos("<url>", "URL to fetch")
         end.tap(&:prepare!)
 
-        assert_nil config.naked?
-
         # flags
         assert_equal({
           format: :str,
@@ -33,21 +31,20 @@ module RunKit
           version: :bool,
         }, config.flags.to_h { [_1.key, _1.kind] })
         assert_equal({quiet: false, timeout: 1.5, retries: 2, format: nil, mode: :fast}, config.defaults)
-        assert_equal [:output], config.required.map(&:key)
 
         # pos/sep
         assert_equal [[:url, "<url>", "URL to fetch"]], config.positionals.map { [_1.key, _1.meta, _1.help] }
         assert_equal [[0, "Options:"]], config.separators
 
         # lookups
-        assert_equal config.flag(:retries), config.flag("--retries")
-        assert_equal ["-r", "--retries"], config.flag(:retries).switches
-        assert_equal "count", config.flag(:retries).meta
-        assert_equal "Retry count", config.flag(:retries).help
+        assert_equal config.lookup[:retries], config.lookup["--retries"]
+        assert_equal ["-r", "--retries"], config.lookup[:retries].switches
+        assert_equal "count", config.lookup[:retries].meta
+        assert_equal "Retry count", config.lookup[:retries].help
 
         # builtins
-        assert_equal config.flag("--help"), config.help_flag
-        assert_equal config.flag("--version"), config.version_flag
+        assert_equal config.lookup["--help"], config.help_flag
+        assert_equal config.lookup["--version"], config.version_flag
       end
 
       def test_reserved_builtins
@@ -77,6 +74,13 @@ module RunKit
         end
       end
 
+      def test_variadic_positionals
+        config = Config.new.tap { _1.pos("<url...>") }
+        %w[<output> <files...>].each do |meta|
+          assert_raises(ArgumentError) { config.pos(meta) }
+        end
+      end
+
       def test_commands
         config = Config.new.tap do |o|
           o.bool("-n", "--dry-run")
@@ -94,7 +98,6 @@ module RunKit
         assert_same config, build.root
         assert_equal "myapp build", build.full_name
         assert_equal "Build the project", build.desc
-        assert_nil build.naked?
         assert_equal false, build.color
         assert_equal config.exit, build.exit
         assert_equal "1.2.3", build.version
@@ -123,6 +126,13 @@ module RunKit
 
       def test_invalid_commands
         assert_raises(ArgumentError) do
+          Config.new.tap do
+            _1.cmd("fetch", default: true)
+            _1.cmd("build", default: true)
+          end
+        end
+
+        assert_raises(ArgumentError) do
           Config.new.tap do |o|
             o.cmd("build") {}
             o.cmd(:build) {}
@@ -131,6 +141,84 @@ module RunKit
 
         assert_raises(ArgumentError) do
           Config.new.cmd("outer") { _1.cmd("inner") }
+        end
+      end
+
+      def test_command_scope
+        %i[cmd sep].each do |method|
+          config = Config.new
+          config.cmd("outer") do
+            assert_raises(ArgumentError) do
+              if method == :cmd
+                config.cmd("inner") {}
+              else
+                config.sep("inner")
+              end
+            end
+            assert_raises(ArgumentError) { config.bool("--leak") }
+          end
+          assert_equal ["outer"], config.commands.keys
+          assert_equal [], config.separators
+        end
+
+        [[:bool, "--force", :force], [:pos, "<url>", :url]].each do |method, declaration, key|
+          config = Config.new
+          assert_raises(ArgumentError) do
+            config.cmd("fetch") { config.public_send(method, declaration) }
+          end
+          assert_equal false, config.key?(key)
+
+          # A failed block must not prevent subsequent root declarations.
+          config.public_send(method, declaration)
+          assert_equal true, config.key?(key)
+        end
+
+        config = Config.new.tap do
+          _1.bool("--before")
+          _1.cmd("fetch") do |c|
+            c.bool("--force")
+            c.pos("<url>")
+          end
+          _1.bool("--after")
+        end.tap(&:prepare!)
+        assert_equal true, config.key?(:before)
+        assert_equal true, config.key?(:after)
+        assert_equal true, config.commands["fetch"].key?(:force)
+        assert_equal true, config.commands["fetch"].key?(:url)
+      end
+
+      def test_command_collisions
+        [
+          ->(c) { c.bool("-n", "--other") },
+          ->(c) { c.bool("--dry-run") },
+          ->(c) { c.bool("--dry_run") },
+          ->(c) { c.pos("<dry_run>") },
+        ].each do |configure|
+          config = Config.new.tap do
+            _1.cmd("build", &configure)
+            _1.bool("-n", "--dry-run")
+          end
+          assert_raises(ArgumentError) { config.prepare! }
+        end
+
+        # Siblings can reuse flags; generated builtins are shared.
+        config = Config.new.tap do
+          _1.version = "1.2.3"
+          _1.cmd("build") { |c| c.bool("-n", "--dry-run") }
+          _1.cmd("test") { |c| c.bool("-n", "--dry-run") }
+        end
+        config.prepare!
+        assert_equal %w[build test], config.commands.keys
+      end
+
+      def test_root_positionals_with_commands
+        [true, false].each do |pos_first|
+          config = Config.new.tap do
+            _1.pos("<url>") if pos_first
+            _1.cmd("build")
+            _1.pos("<url>") unless pos_first
+          end
+          assert_raises(ArgumentError) { config.prepare! }
         end
       end
     end

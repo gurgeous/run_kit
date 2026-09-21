@@ -8,13 +8,11 @@ module RunKit
           "-vnLee",
           "--count=2",
           "--mode", "fast",
-          "--no-quiet",
+          "--quiet",
           "--output", "tmp/out",
           "source.txt",
-          "extra.txt",
         ]
         config = Config.new.tap do
-          _1.naked = false
           _1.bool("-v", "--verbose")
           _1.str("-n", "--name")
           _1.int("--count", choices: [1, 2])
@@ -33,25 +31,26 @@ module RunKit
           count: 2,
           ratio: 1.5,
           mode: :fast,
-          quiet: false,
+          quiet: true,
           output: Pathname("tmp/out"),
           source: "source.txt",
-          _args: ["extra.txt"],
+          _args: [],
           verbose?: true,
-          quiet?: false,
+          quiet?: true,
         }, options)
         assert_equal [
           "-vnLee",
           "--count=2",
           "--mode", "fast",
-          "--no-quiet",
+          "--quiet",
           "--output", "tmp/out",
           "source.txt",
-          "extra.txt",
         ], argv
       end
 
       def test_forms
+        assert_equal({_args: %w[one two]}, parse_args(%w[one two]) {})
+
         argv = ["--name=Lee=Smith", "--", "--verbose"]
         options = parse_args(argv) do
           _1.str("--name")
@@ -116,17 +115,13 @@ module RunKit
           force?: true,
         }, Parser.new(config).parse([]))
 
-        config.naked = true
-        assert_raises(NakedRequested) { Parser.new(config).parse([]) }
-        config.naked = false
-
         ENV["RUN_KIT_TEST_COUNT"] = "many"
         assert_raises(Error) { Parser.new(config).parse(["--count", "3"]) }
 
         ENV["RUN_KIT_TEST_COUNT"] = "2"
-        options = Parser.new(config).parse(["--no-force", "--count", "3"])
-        assert_equal false, options[:force]
-        assert_equal false, options[:force?]
+        options = Parser.new(config).parse(["--count", "3"])
+        assert_equal true, options[:force]
+        assert_equal true, options[:force?]
         assert_equal 3, options[:count]
       ensure
         previous&.each do |name, value|
@@ -134,41 +129,65 @@ module RunKit
         end
       end
 
-      def test_passthru
-        # flags before the first bare token are parsed normally; the token
-        # and everything after (flag-shaped or not) passes through untouched
+      def test_global_flags
         config = Config.new.tap do
-          _1.naked = false
           _1.bool("-n", "--dry-run")
         end
-        options = Parser.new(config).parse(["-n", "build", "-h", "--target", "debug"], passthru: true)
+        child = config.cmd("build") do
+          _1.str("-t", "--target", default: "release")
+          _1.pos("<file>")
+        end
+        config.prepare!
+        options = Parser.new(child).parse(%w[-ntdebug input])
         assert_equal({
           dry_run: true,
-          _args: ["build", "-h", "--target", "debug"],
+          target: "debug",
+          file: "input",
+          _args: [],
           dry_run?: true,
         }, options)
 
-        # `--` still terminates before any bare token is seen
-        options = Parser.new(config).parse(["-n", "--", "-h"], passthru: true)
-        assert_equal({dry_run: true, _args: ["-h"], dry_run?: true}, options)
-
-        # a declared positional still claims the first bare token
-        config.pos("<sub>")
-        options = Parser.new(config).parse(["-n", "build", "--target", "debug"], passthru: true)
+        # `--` terminates parsing for both global and command flags.
+        options = Parser.new(child).parse(%w[-- -n])
         assert_equal({
-          dry_run: true,
-          sub: "build",
-          _args: ["--target", "debug"],
-          dry_run?: true,
+          dry_run: false,
+          target: "release",
+          file: "-n",
+          _args: [],
+          dry_run?: false,
         }, options)
+      end
+
+      def test_variadic_positionals
+        config = Config.new.tap do
+          _1.bool("--force")
+          _1.pos("<output>")
+          _1.pos("<url...>")
+        end
+        [
+          [%w[out one], ["one"], false],
+          [%w[out one --force two], %w[one two], true],
+          [%w[out -- --force two], %w[--force two], false],
+        ].each do |argv, urls, force|
+          options = Parser.new(config).parse(argv)
+          assert_equal "out", options[:output], argv.inspect
+          assert_equal urls, options[:url], argv.inspect
+          assert_equal force, options[:force], argv.inspect
+          assert_equal [], options[:_args], argv.inspect
+        end
+        error = assert_raises(Error) { Parser.new(config).parse(["out"]) }
+        assert_equal "required argument '<url...>' is missing", error.message
+
+        config = Config.new.tap { _1.pos("<url...>") }
+        assert_raises(Error) { Parser.new(config).parse([], infer_help: false) }
+        assert_raises(HelpRequested) { Parser.new(config).parse([]) }
       end
 
       def test_errors
         [
           ["unknown", ["--gub"], ->(o) { o.bool("--good") }],
-          ["required", [], ->(o) { o.str("--name", required: true) }],
-          ["missing positional", [], ->(o) { o.pos("<url>") }],
-          ["non-boolean negation", ["--no-name"], ->(o) { o.str("--name") }],
+          ["required", ["extra"], ->(o) { o.str("--name", required: true) }],
+          ["missing positional", ["--"], ->(o) { o.pos("<url>") }],
           ["invalid smashed", ["-qz"], ->(o) { o.bool("-q") }],
         ].each do |msg, argv, configure|
           assert_raises(Error, msg) { parse_args(argv, &configure) }
@@ -179,7 +198,6 @@ module RunKit
 
       def parse_args(args)
         config = Config.new.tap do
-          _1.naked = false
           yield _1
         end
         Parser.new(config).parse(args)

@@ -6,13 +6,13 @@ module RunKit
       def test_basic
         main = Main.new.tap do
           _1.root.bool("-v", "--verbose")
-          _1.root.bool("--color", default: true)
+          _1.root.bool("--color")
           _1.root.str("--name", default: "default")
           _1.root.positional("<url>")
         end
         options = main.parse([
-          "-v", "--no-color", "--name", "Lee",
-          "https://example.com", "one", "two",
+          "-v", "--name", "Lee",
+          "https://example.com",
         ])
 
         assert_equal({
@@ -20,7 +20,7 @@ module RunKit
           name: "Lee",
           url: "https://example.com",
           verbose: true,
-          _args: %w[one two],
+          _args: [],
           verbose?: true,
           color?: false,
         }, options.to_h)
@@ -53,12 +53,12 @@ module RunKit
         assert_equal 0, status
         assert_includes output, "run-kit 1.2.3"
 
-        # naked
+        # missing required input on a bare invocation
         status = nil
         output, = capture_io do
           Main.new.tap do
             _1.root.app_name = "run-kit"
-            _1.root.naked = true
+            _1.root.pos("<url>")
             _1.root.exit = ->(value) { status = value }
           end.parse([])
         end
@@ -67,35 +67,32 @@ module RunKit
         assert_includes output, "--help"
       end
 
-      def test_inferred_naked
+      def test_inferred_help
         previous = ENV["RUN_KIT_TEST_FORCE"]
         [
-          [nil, nil, [], 0],
-          [nil, "false", [], nil],
-          [nil, "invalid", [], 1],
-          [nil, nil, %w[--no-force], nil],
-          [nil, nil, %w[--other], 1],
-          [true, "false", [], 0],
-          [false, nil, [], 1],
-          [false, "false", [], nil],
-        ].each do |naked, env, argv, expected_status|
+          [nil, [], 0],
+          ["false", [], nil],
+          ["invalid", [], 1],
+          [nil, %w[--no-force], 1],
+          [nil, %w[--other], 1],
+        ].each do |env, argv, expected_status|
           env ? ENV["RUN_KIT_TEST_FORCE"] = env : ENV.delete("RUN_KIT_TEST_FORCE")
-          [false, true].each do |child|
+          %i[root explicit default].each do |mode|
             status = options = nil
             main = Main.new.tap do |m|
               m.root.exit = ->(value, *) { status = value }
-              config = child ? m.root.cmd("build") : m.root
-              config.naked = naked
+              config = (mode == :root) ? m.root : m.root.cmd("build", default: mode == :default)
               config.bool("--force", required: true, env: "RUN_KIT_TEST_FORCE")
               config.bool("--other")
             end
-            output, stderr = capture_io { options = main.parse(child ? ["build", *argv] : argv) }
-            msg = [naked, env, argv, child].inspect
-            assert_equal expected_status, status, msg
-            if expected_status == 0
+            output, stderr = capture_io { options = main.parse((mode == :explicit) ? ["build", *argv] : argv) }
+            msg = [env, argv, mode].inspect
+            expected = (mode == :explicit && expected_status == 0) ? 1 : expected_status
+            assert_equal expected, status, msg
+            if expected == 0
               assert_includes output, "Usage:", msg
               assert_equal "", stderr, msg
-            elsif expected_status == 1
+            elsif expected == 1
               assert_equal "", output, msg
               assert_includes stderr, "try '", msg
             else
@@ -106,15 +103,14 @@ module RunKit
           end
         end
 
-        [nil, true, false].each do |naked|
+        [[], ["example.com"]].each do |argv|
           status = nil
           main = Main.new.tap do
-            _1.root.naked = naked
             _1.root.pos("<url>")
             _1.root.exit = ->(value, *) { status = value }
           end
-          capture_io { main.parse([]) }
-          assert_equal((naked == false) ? 1 : 0, status)
+          capture_io { main.parse(argv) }
+          assert_equal(argv.empty? ? 0 : nil, status)
         end
 
         assert_equal({_args: []}, Main.new.parse([]).to_h)
@@ -122,15 +118,51 @@ module RunKit
         previous ? ENV["RUN_KIT_TEST_FORCE"] = previous : ENV.delete("RUN_KIT_TEST_FORCE")
       end
 
+      def test_bare_commands
+        [
+          [nil, [], nil, "Usage: app <command> [options]"],
+          [nil, ["standalone"], "standalone", nil],
+          [nil, ["sick"], nil, nil],
+          ["standalone", [], "standalone", nil],
+          ["sick", [], nil, "Usage: app <command> [options]"],
+          ["sick", ["sick"], nil, nil],
+        ].each do |default, argv, command, help|
+          status = options = nil
+          main = Main.new.tap do
+            _1.root.app_name = "app"
+            _1.root.color = false
+            _1.root.exit = ->(value) { status = value }
+            _1.root.cmd("standalone", default: default == "standalone")
+            _1.root.cmd("sick", default: default == "sick") { |c| c.pos("<url>") }
+          end
+          output, stderr = capture_io { options = main.parse(argv) }
+          msg = [default, argv].inspect
+          if help
+            assert_equal "", stderr, msg
+            assert_equal 0, status, msg
+            assert_includes output, help, msg
+          elsif command
+            assert_equal "", stderr, msg
+            assert_nil status, msg
+            assert_equal command, options.command, msg
+            assert_equal "", output, msg
+          else
+            assert_equal 1, status, msg
+            assert_equal "", output, msg
+            assert_includes stderr, "app sick: required argument '<url>' is missing", msg
+          end
+        end
+      end
+
       def test_builtin_scan
         previous = ENV["RUN_KIT_TEST_COUNT"]
         ENV["RUN_KIT_TEST_COUNT"] = "invalid"
 
         [
-          [%w[--help build], "Usage: run-kit [options] <command>"],
-          [%w[--dry-run build --help], "Usage: run-kit [options] <command>"],
-          [%w[--required build --help], "Usage: run-kit [options] <command>"],
-          [%w[nonsense build --help], "Usage: run-kit [options] <command>"],
+          [%w[--help build], "Usage: run-kit <command> [options]"],
+          [%w[--dry-run build --help], "Usage: run-kit <command> [options]"],
+          [%w[--required build --help], "Usage: run-kit <command> [options]"],
+          [%w[nonsense build --help], "Usage: run-kit <command> [options]"],
           [%w[build --help], "Usage: run-kit build"],
           [%w[build --unknown -h], "Usage: run-kit build"],
           [%w[build -- --help], "Usage: run-kit build"],
@@ -173,7 +205,6 @@ module RunKit
         _, stderr = capture_io do
           cli = Main.new.tap do
             _1.root.app_name = "run-kit"
-            _1.root.naked = false
             _1.root.exit = ->(value, msg) { status = value }
           end
           cli.parse(["--unknown"])
@@ -202,8 +233,8 @@ module RunKit
           command: "build",
         }, options.to_h)
 
-        # global flag + subcommand flag, merged
-        options = build.call.parse(["-n", "build", "--target", "debug"])
+        # global and subcommand flags follow the command
+        options = build.call.parse(["build", "-n", "--target", "debug"])
         assert_equal({
           dry_run: true,
           target: "debug",
@@ -224,16 +255,16 @@ module RunKit
         assert_includes output, "Other options:"
         assert_includes output, "--dry-run"
 
-        # bare commands show full help when naked is enabled
-        expected_help = output
-        output, = capture_io do
+        # explicitly selected commands report missing requirements
+        output, stderr = capture_io do
           build.call.tap do
-            _1.root.commands["build"].naked = true
+            _1.root.commands["build"].pos("<path>")
             _1.root.exit = ->(value, *) { status = value }
           end.parse(["build"])
         end
-        assert_equal 0, status
-        assert_equal expected_help, output
+        assert_equal 1, status
+        assert_equal "", output
+        assert_includes stderr, "myapp build: required argument '<path>' is missing"
 
         # subcommand --version prints the root version
         output, = capture_io do
@@ -270,10 +301,64 @@ module RunKit
         assert_includes stderr, "myapp build: try 'myapp build --help'"
       end
 
+      def test_command_first
+        main = Main.new.tap do
+          _1.root.exit = ->(*) {}
+          _1.root.bool("-f", "--force")
+          _1.root.int("-n", "--count")
+          _1.root.cmd("build")
+        end
+        %w[--force -f --count=2 -n2].each do |flag|
+          _, stderr = capture_io { assert_nil main.parse([flag, "build"]) }
+          assert_includes stderr, "global options must follow the command"
+        end
+      end
+
+      def test_extra_positionals
+        %i[root explicit default].each do |mode|
+          main = Main.new.tap do
+            _1.root.exit = ->(*) {}
+            config = (mode == :root) ? _1.root : _1.root.cmd("fetch", default: mode == :default)
+            config.pos("<url>")
+          end
+          [%w[example.com extra], %w[example.com -- extra]].each do |args|
+            argv = (mode == :explicit) ? ["fetch", *args] : args
+            _, stderr = capture_io { assert_nil main.parse(argv) }
+            assert_includes stderr, "unexpected argument 'extra' found", "#{mode}: #{argv.inspect}"
+          end
+        end
+      end
+
+      def test_command_env
+        previous = ENV["RUN_KIT_TEST_COUNT"]
+        ENV["RUN_KIT_TEST_COUNT"] = "2"
+        main = Main.new.tap do
+          _1.root.exit = ->(*) {}
+          _1.root.int("--count", required: true, env: "RUN_KIT_TEST_COUNT")
+          _1.root.cmd("build") { |c| c.int("--size", env: "RUN_KIT_TEST_COUNT") }
+        end
+        options = main.parse(%w[build --size 3])
+        assert_equal 2, options.count
+        assert_equal 3, options.size
+
+        ENV.delete("RUN_KIT_TEST_COUNT")
+        _, stderr = capture_io { assert_nil main.parse(%w[build]) }
+        assert_includes stderr, "build: required option '--count' is missing"
+
+        ENV["RUN_KIT_TEST_COUNT"] = "invalid"
+        _, stderr = capture_io { assert_nil main.parse(%w[build --count 3]) }
+        assert_includes stderr, "build:"
+        output, stderr = capture_io { main.parse(%w[build --help]) }
+        assert_includes output, "--count"
+        assert_equal "", stderr
+      ensure
+        previous ? ENV["RUN_KIT_TEST_COUNT"] = previous : ENV.delete("RUN_KIT_TEST_COUNT")
+      end
+
       def test_parse_context
         main = Main.new.tap do
           _1.root.exit = ->(*) {}
-          _1.root.cmd(:build) { |c| c.naked = false }
+          _1.root.cmd(:build)
         end
         main.parse(["build"])
         assert_equal main.root.commands["build"], main.ctx
@@ -306,7 +391,7 @@ module RunKit
             c.validate = ->(options) { seen << [:child, options] }
           end
         end
-        options = main.parse(%w[--force build --count 2])
+        options = main.parse(%w[build --force --count 2])
         assert_equal [[:root, options], [:child, options]], seen
         assert_equal true, options.force?
         assert_equal 2, options.count
@@ -320,7 +405,7 @@ module RunKit
           main = Main.new.tap do |m|
             m.root.app_name = "myapp"
             m.root.exit = ->(code, error) { status, message = code, error }
-            child = m.root.cmd("build") { _1.naked = false }
+            child = m.root.cmd("build")
             {root: m.root, child:}.each do |name, context|
               context.validate = lambda do |_options|
                 seen << name
@@ -337,7 +422,6 @@ module RunKit
         end
 
         main = Main.new.tap do
-          _1.root.naked = false
           _1.root.validate = ->(options) { options.missing_method }
         end
         assert_raises(NoMethodError) { main.parse([]) }
@@ -347,18 +431,72 @@ module RunKit
         [[], %w[--help], %w[--version], %w[--unknown], %w[build], %w[build --help], %w[build --unknown]].each do |argv|
           seen = []
           main = Main.new.tap do
-            _1.root.naked = true
             _1.root.version = "1.2.3"
             _1.root.exit = ->(*) {}
             _1.root.validate = ->(options) { seen << options }
             _1.root.cmd("build") do |c|
-              c.naked = true
+              c.pos("<url>")
               c.validate = ->(options) { seen << options }
             end
           end
           capture_io { main.parse(argv) }
           assert_equal [], seen, argv.inspect
         end
+      end
+
+      def test_default_command
+        [
+          [%w[example.com], "fetch", "example.com", 1, false],
+          [%w[stats], "fetch", "stats", 1, false],
+          [%w[fetch example.com], "fetch", "example.com", 1, false],
+          [%w[--count=2 example.com], "fetch", "example.com", 2, false],
+          [%w[-n2 example.com], "fetch", "example.com", 2, false],
+          [%w[--dry-run --count 2 example.com], "fetch", "example.com", 2, true],
+          [%w[status --dry-run], "status", nil, nil, true],
+          [%w[--dry-run status], "fetch", "status", 1, true],
+        ].each do |argv, command, url, count, dry_run|
+          options = Options.parse(argv) do
+            _1.bool("--dry-run")
+            _1.cmd("fetch", default: true) do |c|
+              c.pos("<url>")
+              c.int("-n", "--count", default: 1)
+            end
+            _1.cmd("status")
+          end
+          assert_equal command, options.command, argv.inspect
+          assert_equal dry_run, options.dry_run, argv.inspect
+          if command == "fetch"
+            assert_equal url, options.url, argv.inspect
+            assert_equal count, options.count, argv.inspect
+            assert_equal [], options._args, argv.inspect
+          end
+        end
+
+        options = Options.parse([]) { _1.cmd("status", default: true) }
+        assert_equal "status", options.command
+      end
+
+      def test_default_command_help_and_errors
+        main = Main.new.tap do
+          _1.root.app_name = "app"
+          _1.root.color = false
+          _1.root.exit = ->(*) {}
+          _1.root.cmd("fetch", "Fetch a URL", default: true) { |c| c.pos("<url>") }
+          _1.root.cmd("status")
+        end
+
+        output, = capture_io { main.parse(["--help"]) }
+        assert_includes output, "Usage: app <command> [options]"
+        assert_includes output, "fetch (default)  Fetch a URL"
+
+        output, = capture_io { main.parse([]) }
+        assert_includes output, "Usage: app <command> [options]"
+
+        status = nil
+        main.root.exit = ->(value) { status = value }
+        _, stderr = capture_io { main.parse(%w[--unknown example.com]) }
+        assert_equal 1, status
+        assert_includes stderr, "app fetch: unexpected argument '--unknown'"
       end
 
       def test_command_key

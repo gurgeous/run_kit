@@ -3,6 +3,13 @@ require "run_kit"
 module RunKit
   module Options
     class FlagTest < Minitest::Test
+      def test_error_context
+        error = assert_raises(ArgumentError) do
+          Config.new.int("-c", "--count <number>", default: "many")
+        end
+        assert_includes error.message, "--count"
+      end
+
       def test_basic
         flag = Flag.new(
           :sym,
@@ -86,6 +93,8 @@ module RunKit
         [
           ["kind", -> { Flag.new(:unknown, ["--unknown"]) }],
           ["switch missing", -> { Flag.new(:str, []) }],
+          ["undashed name", -> { Config.new.str("something") }],
+          ["undashed name with env", -> { Config.new.str("something", env: true) }],
           ["switch type", -> { Flag.new(:str, [:name]) }],
           ["switch format", -> { Flag.new(:str, ["-word"]) }],
           ["switch duplicate", -> { Flag.new(:str, ["-n", "-n"]) }],

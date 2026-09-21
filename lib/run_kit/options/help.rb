@@ -18,12 +18,13 @@ module RunKit
       # Render generated help, unless the caller supplied complete help text.
       def to_s
         return config.help if config.help
+        options = flags_text(config, "Options:", builtins: !config.root)
         help = [].tap do
           _1 << desc if config.desc
           _1 << banner
           _1 << commands_text if config.commands.any?
-          _1 << flags_text(config, "Options:", builtins: !config.root)
-          _1 << flags_text(config.root, "Other options:") if config.root
+          _1 << options
+          _1 << flags_text(config.root, options ? "Other options:" : "Options:") if config.root
         end.compact.join("\n\n")
         "#{help}\n"
       end
@@ -67,19 +68,22 @@ module RunKit
       # Build the usage line from the command's full name and positionals.
       def banner
         text = config.banner
-        text ||= [color.blue("Usage:"), color.green(config.full_name), "[options]"].tap do
-          _1.push(*config.positionals.map(&:meta))
+        text ||= [color.blue("Usage:"), color.green(config.full_name)].tap do
           _1.push(color.yellow("<command>")) if config.commands.any?
+          _1.push("[options]", *config.positionals.map { |pos| color.yellow(pos.meta) })
         end.join(" ")
         Term.wrap(text, width)
       end
 
       # Render the list of subcommands, aligned like the flag list above.
       def commands_text
+        commands = config.commands.map do |name, child|
+          [child.default? ? "#{name} (default)" : name, child]
+        end
         [].tap do |lines|
           lines << color.blue("Commands:")
-          label_width = config.commands.keys.map { Term.width(_1) }.max
-          config.commands.each do |name, child|
+          label_width = commands.map { Term.width(_1.first) }.max
+          commands.each do |name, child|
             lines << StringIO.new.tap do |buf|
               buf << " " * INDENT << color.green(name)
               if child.desc

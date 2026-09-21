@@ -58,9 +58,14 @@ o.cmd "test", "Run tests" do |c|
   c.bool "--verbose"
 end
 
-# myapp build --target debug
-# => #<data command="build", dry_run=false, target="debug", _args=[]>
+# myapp build --dry-run --target debug
+# => #<data command="build", dry_run=true, target="debug", _args=[]>
 ```
+
+Put the command first, then global or command flags in any order. If the first
+argument isn't a command, a `default: true` command receives all arguments.
+Root positionals aren't supported with subcommands; global and command flags
+must have distinct switches and keys.
 
 ## RunKit::Shell
 
@@ -74,7 +79,9 @@ end
 | `jsonl_read` / `jsonl_write`   | Atomic read/write jsonl (add .gz for gzip)          |
 |                                |
 | `csv_write_stdout`             | Write CSV to stdout                                 |
+| `csv_write_to_s`               | Generate CSV string                                 |
 | `gunzip` / `gzip`              | (De)compress a string                               |
+|                                |
 | `atomic_write`                 | Atomically replace a file                           |
 | `cache_fetch`                  | Populate/fetch from file cache w/ block             |
 | `cp_metadata`                  | Copy file metadata from src to dst                  |
@@ -132,11 +139,18 @@ RunKit also installs a small set of core extensions to assist with bin scripts.
 
 Note: There has been some effort to get the Pathname helpers into Ruby itself, without much success.
 
+### Future Work
+
+- argv? ask nak for ideas
+
 ### Changelog
 
-#### (unreleased)
+#### 0.1.6 (Sep 2026)
 
-- default `naked` to `nil`: show help on empty argv when required flags or positionals remain missing after ENV resolution; honor explicit `true`/`false`
+- default subcommands with `default: true`
+- `<url...>` positionals for 1+ values
+- remove `naked` and just do the right thing
+- add `csv_write_to_s` for CSV string output
 
 #### 0.1.5 (Sep 2026)
 

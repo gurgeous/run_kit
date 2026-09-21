@@ -6,29 +6,27 @@
 module RunKit
   module Options
     class Parser
-      attr_reader :config
+      attr_reader(*%i[config flags lookup])
 
       def initialize(config)
         @config = config
+        @flags = config.root ? (config.root.flags - [config.root.help_flag, config.root.version_flag]) + config.flags : config.flags
+        @lookup = (config.root&.lookup || {}).merge(config.lookup)
       end
 
-      # Reset transient state, parse argv, and assemble the result. When
-      # passthru is set, scanning halts at the first bare arg (for subcommands).
-      def parse(argv, passthru: false)
-        # 1. naked?
-        raise NakedRequested if config.naked? && argv.empty?
+      # Parse global and command flags together, then assemble the result.
+      def parse(argv, infer_help: true)
+        # 1. Parse argv.
+        argv_options = parse_argv(argv)
 
-        # 2. Parse argv.
-        argv_options = parse_argv(argv, passthru:)
+        # 2. defaults => ENV => ARGV
+        options = {}.merge(config.root&.defaults || {}, config.defaults, parse_env, argv_options)
 
-        # 3. defaults => ENV => ARGV
-        options = {}.merge(config.defaults, parse_env, argv_options)
-
-        # 4. validate final options
-        validate!(options, naked: config.naked.nil? && argv.empty?)
+        # 3. Validate requirements after ENV resolution; bare missing inputs show help.
+        validate!(options, infer_help: infer_help && argv.empty?)
 
         # success! add predicate? keys
-        config.flags.select(&:bool?).map(&:key).each do
+        flags.select(&:bool?).map(&:key).each do
           options[:"#{_1}?"] = options[_1] if options.key?(_1)
         end
 
@@ -41,10 +39,10 @@ module RunKit
       # main parser
       #
 
-      def parse_argv(argv, passthru: false)
+      def parse_argv(argv)
         {}.tap do |result|
           # any non-flags we find below
-          operands = []
+          args = []
 
           # process argv as queue
           queue = argv.dup
@@ -53,43 +51,35 @@ module RunKit
             when Flag::SWITCH_RE, Flag::INLINE_RE then result.merge!(parse_switch(item, Regexp.last_match, queue))
             when /\A-[^-]/ then result.merge!(parse_smashed(item, queue))
             when "", /\A[^-]/
-              operands << item
-              if passthru
-                operands.concat(queue)
-                break
-              end
-            when "--" then break operands.concat(queue)
+              args << item
+            when "--" then break args.concat(queue)
             else; raise Error, "unexpected argument '#{item}' found"
             end
           end
 
           # positionals
-          config.positionals.each { result[_1.key] = operands.shift }
+          config.positionals.each { result[_1.key] = _1.variadic? ? args.shift(args.length) : args.shift }
+          if config.positionals.any? && args.any?
+            raise Error, "unexpected argument '#{args.first}' found"
+          end
 
           # _args
-          result[:_args] = operands
+          result[:_args] = args
         end
       end
 
       #
-      # -x or -x=123 or --xyz or --xyz=123 or --no-xyz
+      # -x or -x=123 or --xyz or --xyz=123
       #
 
       def parse_switch(item, match, queue)
         switch = "-#{match[1]}"
         param = match[2]
-        separator = param ? "=" : ""
 
         # -x or --xyz?
-        if (flag = config.flag(switch))
-          param = queue.shift if flag.takes_param? && separator.empty?
+        if (flag = lookup[switch])
+          param = queue.shift if flag.takes_param? && !param
           return {flag.key => flag.parse(switch, param)}
-        end
-
-        # --no-xyz?
-        if (neg = find_negated_flag(switch))
-          raise Error, "option '#{item}' does not take a value" if separator == "="
-          return {neg.key => false}
         end
 
         raise Error, "unexpected argument '#{item}' found"
@@ -105,7 +95,7 @@ module RunKit
         result = {}
         (1...group.length).each do |idx|
           switch = "-#{group[idx]}"
-          flag = config.flag(switch)
+          flag = lookup[switch]
           raise Error, "unexpected argument '#{group}' found" unless flag
 
           # For `-qnLee`, `Lee` belongs to `-n`; for `-qn Lee`, shift the queue.
@@ -130,7 +120,7 @@ module RunKit
       #
 
       def parse_env
-        config.flags.select { _1.env && ENV.key?(_1.env) }.map do |flag|
+        flags.select { _1.env && ENV.key?(_1.env) }.map do |flag|
           [flag.key, flag.parse_env(ENV[flag.env])]
         end.to_h
       end
@@ -139,23 +129,16 @@ module RunKit
       # helpers
       #
 
-      def find_negated_flag(switch)
-        if (m = Flag::NEGATE_RE.match(switch))
-          flag = config.flag("--#{m[1]}")
-          flag if flag&.bool?
-        end
-      end
-
-      def validate!(options, naked: false)
+      def validate!(options, infer_help: false)
         # Infer help only for missing inputs, after ENV has been resolved.
-        config.required.each do
+        flags.select(&:required?).each do
           next if options.key?(_1.key)
-          raise NakedRequested if naked
+          raise HelpRequested if infer_help
           raise Error, "required option '#{_1.switch}' is missing"
         end
         config.positionals.each do
-          next if options[_1.key]
-          raise NakedRequested if naked
+          next if _1.variadic? ? options[_1.key].any? : options[_1.key]
+          raise HelpRequested if infer_help
           raise Error, "required argument '#{_1.meta}' is missing"
         end
       end
