@@ -40,7 +40,7 @@ module RunKit
 
           Usage: run-kit build [options]
 
-          Other options:
+          Options:
             -h, --help  Show this message
         TEXT
         assert_equal exp, Help.new(config.commands["build"], 60).to_s
@@ -107,7 +107,7 @@ module RunKit
         end.tap(&:prepare!)
 
         exp = <<~TEXT
-          Usage: run-kit [options] <command>
+          Usage: run-kit <command> [options]
 
           Commands:
             build  Build the project
@@ -145,7 +145,7 @@ module RunKit
         end.tap(&:prepare!)
 
         exp = <<~TEXT
-          Usage: run-kit [options] <command>
+          Usage: run-kit <command> [options]
 
           Commands:
             build  one two three four five six seven eight nine ten
@@ -162,10 +162,15 @@ module RunKit
         config = base_config.tap do
           _1.color = true
           _1.str("--host <name>", "hostname")
+          _1.pos("<output>")
+          _1.pos("<url...>")
         end.tap(&:prepare!)
 
         assert_match(/\e\[1;32m--host\e\[0m/, Help.new(config).to_s)
         assert_match(/\e\[1;33m<name>\e\[0m/, Help.new(config).to_s)
+        %w[<output> <url...>].each do |meta|
+          assert_includes Help.new(config).banner, Color.new(true).yellow(meta)
+        end
       end
 
       def test_separator_spacing

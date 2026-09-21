@@ -91,7 +91,8 @@ module RunKit
           return exit_fn(1, error: ex.message)
         end
 
-        puts Help.new(ctx)
+        # Inferred help on a bare invocation introduces the whole app.
+        puts Help.new(root)
         exit_fn(0)
       end
 

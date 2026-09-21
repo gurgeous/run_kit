@@ -134,8 +134,7 @@ module RunKit
 
         # Global and command flags share one parser; only builtins may overlap.
         if root
-          keys = lookup.keys - [help_flag, version_flag].compact.flat_map { [_1.key, *_1.switches] }
-          collisions = keys & root.lookup.keys
+          collisions = collision_keys & root.collision_keys
           raise ArgumentError, "command #{name} conflicts with global options: #{collisions.join(", ")}" if collisions.any?
         end
 
@@ -144,6 +143,15 @@ module RunKit
       end
 
       protected
+
+      # Include implicit --no-* switches when checking global/command overlap.
+      def collision_keys
+        user_flags = flags - [help_flag, version_flag]
+        positionals.map(&:key) + user_flags.flat_map do |flag|
+          negations = flag.bool? ? flag.switches.filter_map { "--no-#{_1.delete_prefix("--")}" if _1.start_with?("--") } : []
+          [flag.key, *flag.switches, *negations]
+        end
+      end
 
       # Catch accidental use of the outer config while defining a command.
       def with_inside(name)

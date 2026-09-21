@@ -6,7 +6,7 @@ options = RunKit.parse do |o|
   o.version = "1.0"
   o.bool "--dry-run", "Preview without making changes"
   o.desc = "this is made up"
-  # o.str "gub"
+  o.str "--gub"
 
   o.cmd("sub", default: true) do
     _1.pos "<pos...>"

@@ -120,11 +120,11 @@ module RunKit
 
       def test_bare_commands
         [
-          [nil, [], nil, "Usage: app [options] <command>"],
+          [nil, [], nil, "Usage: app <command> [options]"],
           [nil, ["standalone"], "standalone", nil],
           [nil, ["sick"], nil, nil],
           ["standalone", [], "standalone", nil],
-          ["sick", [], nil, "Usage: app sick [options] <url>"],
+          ["sick", [], nil, "Usage: app <command> [options]"],
           ["sick", ["sick"], nil, nil],
         ].each do |default, argv, command, help|
           status = options = nil
@@ -159,10 +159,10 @@ module RunKit
         ENV["RUN_KIT_TEST_COUNT"] = "invalid"
 
         [
-          [%w[--help build], "Usage: run-kit [options] <command>"],
-          [%w[--dry-run build --help], "Usage: run-kit [options] <command>"],
-          [%w[--required build --help], "Usage: run-kit [options] <command>"],
-          [%w[nonsense build --help], "Usage: run-kit [options] <command>"],
+          [%w[--help build], "Usage: run-kit <command> [options]"],
+          [%w[--dry-run build --help], "Usage: run-kit <command> [options]"],
+          [%w[--required build --help], "Usage: run-kit <command> [options]"],
+          [%w[nonsense build --help], "Usage: run-kit <command> [options]"],
           [%w[build --help], "Usage: run-kit build"],
           [%w[build --unknown -h], "Usage: run-kit build"],
           [%w[build -- --help], "Usage: run-kit build"],
@@ -484,11 +484,11 @@ module RunKit
         end
 
         output, = capture_io { main.parse(["--help"]) }
-        assert_includes output, "Usage: app [options] <command>"
+        assert_includes output, "Usage: app <command> [options]"
         assert_includes output, "fetch (default)  Fetch a URL"
 
         output, = capture_io { main.parse([]) }
-        assert_includes output, "Usage: app fetch [options] <url>"
+        assert_includes output, "Usage: app <command> [options]"
 
         status = nil
         main.root.exit = ->(value) { status = value }

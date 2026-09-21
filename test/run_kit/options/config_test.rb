@@ -199,6 +199,16 @@ module RunKit
         assert_equal %w[build test], config.commands.keys
       end
 
+      def test_negated_command_collisions
+        [%w[--color --no-color], %w[--no-color --color]].each do |global, local|
+          config = Config.new.tap do
+            _1.bool(global)
+            _1.cmd("build") { |c| c.bool(local) }
+          end
+          assert_raises(ArgumentError, [global, local].inspect) { config.prepare! }
+        end
+      end
+
       def test_root_positionals_with_commands
         [true, false].each do |pos_first|
           config = Config.new.tap do
