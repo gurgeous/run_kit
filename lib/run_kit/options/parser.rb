@@ -6,26 +6,27 @@
 module RunKit
   module Options
     class Parser
-      attr_reader :config
+      attr_reader(*%i[config flags lookup])
 
       def initialize(config)
         @config = config
+        @flags = config.root ? (config.root.flags - [config.root.help_flag, config.root.version_flag]) + config.flags : config.flags
+        @lookup = (config.root&.lookup || {}).merge(config.lookup)
       end
 
-      # Reset transient state, parse argv, and assemble the result. When
-      # passthru is set, scanning halts at the first bare arg (for subcommands).
-      def parse(argv, passthru: false, infer_help: true)
+      # Parse global and command flags together, then assemble the result.
+      def parse(argv, infer_help: true)
         # 1. Parse argv.
-        argv_options = parse_argv(argv, passthru:)
+        argv_options = parse_argv(argv)
 
         # 2. defaults => ENV => ARGV
-        options = {}.merge(config.defaults, parse_env, argv_options)
+        options = {}.merge(config.root&.defaults || {}, config.defaults, parse_env, argv_options)
 
         # 3. Validate requirements after ENV resolution; bare missing inputs show help.
         validate!(options, infer_help: infer_help && argv.empty?)
 
         # success! add predicate? keys
-        config.flags.select(&:bool?).map(&:key).each do
+        flags.select(&:bool?).map(&:key).each do
           options[:"#{_1}?"] = options[_1] if options.key?(_1)
         end
 
@@ -38,7 +39,7 @@ module RunKit
       # main parser
       #
 
-      def parse_argv(argv, passthru: false)
+      def parse_argv(argv)
         {}.tap do |result|
           # any non-flags we find below
           operands = []
@@ -46,23 +47,11 @@ module RunKit
           # process argv as queue
           queue = argv.dup
           while (item = queue.shift)
-            # An unknown root switch starts the default command's arguments.
-            if passthru && config.default_command && item.start_with?("-") && item != "--"
-              switch = item.start_with?("--") ? item.split("=", 2).first : item[0, 2]
-              if !config.flag?(switch) && !find_negated_flag(switch)
-                break operands.concat([item, *queue])
-              end
-            end
-
             case item
             when Flag::SWITCH_RE, Flag::INLINE_RE then result.merge!(parse_switch(item, Regexp.last_match, queue))
             when /\A-[^-]/ then result.merge!(parse_smashed(item, queue))
             when "", /\A[^-]/
               operands << item
-              if passthru
-                operands.concat(queue)
-                break
-              end
             when "--" then break operands.concat(queue)
             else; raise Error, "unexpected argument '#{item}' found"
             end
@@ -86,7 +75,7 @@ module RunKit
         separator = param ? "=" : ""
 
         # -x or --xyz?
-        if (flag = config.flag(switch))
+        if (flag = lookup[switch])
           param = queue.shift if flag.takes_param? && separator.empty?
           return {flag.key => flag.parse(switch, param)}
         end
@@ -110,7 +99,7 @@ module RunKit
         result = {}
         (1...group.length).each do |idx|
           switch = "-#{group[idx]}"
-          flag = config.flag(switch)
+          flag = lookup[switch]
           raise Error, "unexpected argument '#{group}' found" unless flag
 
           # For `-qnLee`, `Lee` belongs to `-n`; for `-qn Lee`, shift the queue.
@@ -135,7 +124,7 @@ module RunKit
       #
 
       def parse_env
-        config.flags.select { _1.env && ENV.key?(_1.env) }.map do |flag|
+        flags.select { _1.env && ENV.key?(_1.env) }.map do |flag|
           [flag.key, flag.parse_env(ENV[flag.env])]
         end.to_h
       end
@@ -146,14 +135,14 @@ module RunKit
 
       def find_negated_flag(switch)
         if (m = Flag::NEGATE_RE.match(switch))
-          flag = config.flag("--#{m[1]}")
+          flag = lookup["--#{m[1]}"]
           flag if flag&.bool?
         end
       end
 
       def validate!(options, infer_help: false)
         # Infer help only for missing inputs, after ENV has been resolved.
-        config.required.each do
+        flags.select(&:required?).each do
           next if options.key?(_1.key)
           raise HelpRequested if infer_help
           raise Error, "required option '#{_1.switch}' is missing"

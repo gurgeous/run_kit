@@ -233,8 +233,8 @@ module RunKit
           command: "build",
         }, options.to_h)
 
-        # global flag + subcommand flag, merged
-        options = build.call.parse(["-n", "build", "--target", "debug"])
+        # global and subcommand flags follow the command
+        options = build.call.parse(["build", "-n", "--target", "debug"])
         assert_equal({
           dry_run: true,
           target: "debug",
@@ -301,6 +301,42 @@ module RunKit
         assert_includes stderr, "myapp build: try 'myapp build --help'"
       end
 
+      def test_command_first
+        main = Main.new.tap do
+          _1.root.exit = ->(*) {}
+          _1.root.bool("--force")
+          _1.root.cmd("build")
+        end
+        _, stderr = capture_io { assert_nil main.parse(%w[--force build]) }
+        assert_includes stderr, "unknown command '--force'"
+      end
+
+      def test_command_env
+        previous = ENV["RUN_KIT_TEST_COUNT"]
+        ENV["RUN_KIT_TEST_COUNT"] = "2"
+        main = Main.new.tap do
+          _1.root.exit = ->(*) {}
+          _1.root.int("--count", required: true, env: "RUN_KIT_TEST_COUNT")
+          _1.root.cmd("build") { |c| c.int("--size", env: "RUN_KIT_TEST_COUNT") }
+        end
+        options = main.parse(%w[build --size 3])
+        assert_equal 2, options.count
+        assert_equal 3, options.size
+
+        ENV.delete("RUN_KIT_TEST_COUNT")
+        _, stderr = capture_io { assert_nil main.parse(%w[build]) }
+        assert_includes stderr, "build: required option '--count' is missing"
+
+        ENV["RUN_KIT_TEST_COUNT"] = "invalid"
+        _, stderr = capture_io { assert_nil main.parse(%w[build --count 3]) }
+        assert_includes stderr, "build:"
+        output, stderr = capture_io { main.parse(%w[build --help]) }
+        assert_includes output, "--count"
+        assert_equal "", stderr
+      ensure
+        previous ? ENV["RUN_KIT_TEST_COUNT"] = previous : ENV.delete("RUN_KIT_TEST_COUNT")
+      end
+
       def test_parse_context
         main = Main.new.tap do
           _1.root.exit = ->(*) {}
@@ -337,7 +373,7 @@ module RunKit
             c.validate = ->(options) { seen << [:child, options] }
           end
         end
-        options = main.parse(%w[--force build --count 2])
+        options = main.parse(%w[build --force --count 2])
         assert_equal [[:root, options], [:child, options]], seen
         assert_equal true, options.force?
         assert_equal 2, options.count
@@ -399,7 +435,8 @@ module RunKit
           [%w[-n2 example.com], "fetch", "example.com", 2, false],
           [%w[--dry-run --count 2 example.com], "fetch", "example.com", 2, true],
           [%w[--no-dry-run example.com], "fetch", "example.com", 1, false],
-          [%w[--dry-run status], "status", nil, nil, true],
+          [%w[status --dry-run], "status", nil, nil, true],
+          [%w[--dry-run status], "fetch", "status", 1, true],
         ].each do |argv, command, url, count, dry_run|
           options = Options.parse(argv) do
             _1.bool("--dry-run")

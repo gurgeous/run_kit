@@ -113,6 +113,9 @@ module RunKit
       # Complete one-time setup after the caller has declared overrides.
       def prepare!
         return if @prepared
+        if commands.any? && positionals.any?
+          raise ArgumentError, "a command with subcommands cannot also take positional arguments; add them to a subcommand instead"
+        end
         @prepared = true
 
         # Children inherit shared settings before adding builtins.
@@ -124,6 +127,13 @@ module RunKit
         @exit ||= lambda { |status| Kernel.exit(status) }
         @help_flag = bool("-h", "--help", "Show this message")
         @version_flag = bool("-v", "--version", "Show version") if version
+
+        # Global and command flags share one parser; only builtins may overlap.
+        if root
+          keys = lookup.keys - [help_flag, version_flag].compact.flat_map { [_1.key, *_1.switches] }
+          collisions = keys & root.lookup.keys
+          raise ArgumentError, "command #{name} conflicts with global options: #{collisions.join(", ")}" if collisions.any?
+        end
 
         # setup subcommands
         commands.each_value(&:prepare!)

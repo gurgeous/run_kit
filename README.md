@@ -58,9 +58,14 @@ o.cmd "test", "Run tests" do |c|
   c.bool "--verbose"
 end
 
-# myapp build --target debug
-# => #<data command="build", dry_run=false, target="debug", _args=[]>
+# myapp build --dry-run --target debug
+# => #<data command="build", dry_run=true, target="debug", _args=[]>
 ```
+
+Put the command first, then global or command flags in any order. If the first
+argument isn't a command, a `default: true` command receives all arguments.
+Root positionals aren't supported with subcommands; global and command flags
+must have distinct switches and keys.
 
 ## RunKit::Shell
 

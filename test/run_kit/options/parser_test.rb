@@ -129,31 +129,32 @@ module RunKit
         end
       end
 
-      def test_passthru
-        # flags before the first bare token are parsed normally; the token
-        # and everything after (flag-shaped or not) passes through untouched
+      def test_global_flags
         config = Config.new.tap do
           _1.bool("-n", "--dry-run")
         end
-        options = Parser.new(config).parse(["-n", "build", "-h", "--target", "debug"], passthru: true)
+        child = config.cmd("build") do
+          _1.str("-t", "--target", default: "release")
+          _1.pos("<file>")
+        end
+        config.prepare!
+        options = Parser.new(child).parse(%w[-ntdebug input extra])
         assert_equal({
           dry_run: true,
-          _args: ["build", "-h", "--target", "debug"],
+          target: "debug",
+          file: "input",
+          _args: ["extra"],
           dry_run?: true,
         }, options)
 
-        # `--` still terminates before any bare token is seen
-        options = Parser.new(config).parse(["-n", "--", "-h"], passthru: true)
-        assert_equal({dry_run: true, _args: ["-h"], dry_run?: true}, options)
-
-        # a declared positional still claims the first bare token
-        config.pos("<sub>")
-        options = Parser.new(config).parse(["-n", "build", "--target", "debug"], passthru: true)
+        # `--` terminates parsing for both global and command flags.
+        options = Parser.new(child).parse(%w[--no-dry-run -- -n -t])
         assert_equal({
-          dry_run: true,
-          sub: "build",
-          _args: ["--target", "debug"],
-          dry_run?: true,
+          dry_run: false,
+          target: "release",
+          file: "-n",
+          _args: ["-t"],
+          dry_run?: false,
         }, options)
       end
 

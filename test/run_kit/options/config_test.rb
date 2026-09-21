@@ -140,6 +140,41 @@ module RunKit
           Config.new.cmd("outer") { _1.cmd("inner") }
         end
       end
+
+      def test_command_collisions
+        [
+          ->(c) { c.bool("-n", "--other") },
+          ->(c) { c.bool("--dry-run") },
+          ->(c) { c.bool("--dry_run") },
+          ->(c) { c.pos("<dry_run>") },
+        ].each do |configure|
+          config = Config.new.tap do
+            _1.cmd("build", &configure)
+            _1.bool("-n", "--dry-run")
+          end
+          assert_raises(ArgumentError) { config.prepare! }
+        end
+
+        # Siblings can reuse flags; generated builtins are shared.
+        config = Config.new.tap do
+          _1.version = "1.2.3"
+          _1.cmd("build") { |c| c.bool("-n", "--dry-run") }
+          _1.cmd("test") { |c| c.bool("-n", "--dry-run") }
+        end
+        config.prepare!
+        assert_equal %w[build test], config.commands.keys
+      end
+
+      def test_root_positionals_with_commands
+        [true, false].each do |pos_first|
+          config = Config.new.tap do
+            _1.pos("<url>") if pos_first
+            _1.cmd("build")
+            _1.pos("<url>") unless pos_first
+          end
+          assert_raises(ArgumentError) { config.prepare! }
+        end
+      end
     end
   end
 end

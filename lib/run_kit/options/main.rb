@@ -59,14 +59,9 @@ module RunKit
         end
       end
 
-      # Peek at the first bare argument to pick a subcommand, then parse the
-      # rest with its own Config and merge the two option hashes together.
+      # Select from the first argument, then parse global and command flags together.
       def subcommand(argv)
-        # Parse root options before the subcommand.
-        root_options = parse_with_ctx(root, argv, passthru: true)
-        rest = root_options[:_args]
-
-        # Find and parse the child.
+        rest = argv
         if (child = root.commands[rest.first])
           rest = rest.drop(1)
           infer_help = false
@@ -76,10 +71,7 @@ module RunKit
         end
         raise HelpRequested if !child && rest.empty?
         raise Error, "unknown command '#{rest.first}'" if !child
-        child_options = parse_with_ctx(child, rest, infer_help:)
-
-        # merge
-        root_options.merge(child_options).merge(command: child.name)
+        parse_with_ctx(child, rest, infer_help:).merge(command: child.name)
       end
 
       # Validate the final options, root first.
@@ -122,9 +114,9 @@ module RunKit
         yield
       end
 
-      def parse_with_ctx(ctx, argv, passthru: false, infer_help: true)
+      def parse_with_ctx(ctx, argv, infer_help: true)
         with_ctx(ctx) do
-          Parser.new(ctx).parse(argv, passthru:, infer_help:)
+          Parser.new(ctx).parse(argv, infer_help:)
         end
       end
 
