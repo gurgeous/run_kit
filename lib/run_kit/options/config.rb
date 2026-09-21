@@ -20,6 +20,7 @@ module RunKit
 
       # Add a positional param declared as `<url>`.
       def pos(meta, help = "")
+        check_inside!
         if positionals.last&.variadic?
           raise ArgumentError, "no positional arguments are allowed after #{positionals.last.meta}"
         end
@@ -35,11 +36,11 @@ module RunKit
         name = name.to_s
         raise ArgumentError, "duplicate command #{name}" if commands.key?(name)
         raise ArgumentError, "default command already set" if default && default_command
-        Config.new(name:).tap do
-          _1.default, _1.desc, _1.root = default, desc, self
-          yield _1 if block_given?
-          raise ArgumentError, "nested commands are not supported" if _1.commands.any?
-          commands[name] = _1
+        Config.new(name:).tap do |child|
+          child.default, child.desc, child.root = default, desc, self
+          with_inside(name) { yield child } if block_given?
+          raise ArgumentError, "nested commands are not supported" if child.commands.any?
+          commands[name] = child
         end
       end
 
@@ -144,7 +145,20 @@ module RunKit
 
       protected
 
+      # Catch accidental use of the outer config while defining a command.
+      def with_inside(name)
+        @inside = name
+        yield
+      ensure
+        @inside = nil
+      end
+
+      def check_inside!
+        raise ArgumentError, "you're adding a root option inside #{@inside.inspect} command" if @inside
+      end
+
       def add_flag(flag)
+        check_inside!
         # dup check
         raise ArgumentError, "reserved flag key: _args" if flag.key == :_args
         raise ArgumentError, "dup flag key: #{flag.key}" if key?(flag.key)

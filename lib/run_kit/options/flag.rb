@@ -41,12 +41,8 @@ module RunKit
 
         validate
       rescue ArgumentError => ex
-        settings = {default:, required:, choices:, env:}.compact
-        settings.delete(:required) if required == false
-        settings = settings.map { "#{_1}: #{_2.inspect}" }.join(", ")
-        context = "opt.#{kind} #{opts.inspect}"
-        context = "#{context} (#{settings})" unless settings.empty?
-        raise ArgumentError, "#{context}: #{ex.message}", cause: nil
+        ctx = reconstruct(kind, opts, default:, required:, choices:, env:)
+        raise ArgumentError, "#{ctx} - #{ex.message}", cause: nil
       end
 
       #
@@ -122,6 +118,12 @@ module RunKit
       #
       # helpers
       #
+
+      # Use the original declaration, before metadata and ENV normalization.
+      def reconstruct(kind, opts, **settings)
+        args = opts.map(&:inspect) + settings.filter_map { "#{_1}: #{_2.inspect}" if _2 }
+        ["opt.#{kind}", args.join(", ")].reject(&:empty?).join(" ")
+      end
 
       def build_meta
         # Only the final spelling may carry an inferred `<meta>`.

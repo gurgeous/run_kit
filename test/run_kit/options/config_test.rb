@@ -148,6 +148,33 @@ module RunKit
         end
       end
 
+      def test_command_scope
+        [[:bool, "--force", :force], [:pos, "<url>", :url]].each do |method, declaration, key|
+          config = Config.new
+          assert_raises(ArgumentError) do
+            config.cmd("fetch") { config.public_send(method, declaration) }
+          end
+          assert_equal false, config.key?(key)
+
+          # A failed block must not prevent subsequent root declarations.
+          config.public_send(method, declaration)
+          assert_equal true, config.key?(key)
+        end
+
+        config = Config.new.tap do
+          _1.bool("--before")
+          _1.cmd("fetch") do |c|
+            c.bool("--force")
+            c.pos("<url>")
+          end
+          _1.bool("--after")
+        end.tap(&:prepare!)
+        assert_equal true, config.key?(:before)
+        assert_equal true, config.key?(:after)
+        assert_equal true, config.commands["fetch"].key?(:force)
+        assert_equal true, config.commands["fetch"].key?(:url)
+      end
+
       def test_command_collisions
         [
           ->(c) { c.bool("-n", "--other") },
