@@ -37,14 +37,17 @@ module RunKit
         [1, 2].each.with_progressbar(output:, hide: true) { values << _1 }
 
         assert_equal [1, 2], values
-        assert_equal "\e[?25l\e[?25h", output.string
+        assert_equal "", output.string
 
         output = StringIO.new
         [1].each.with_progressbar(output:) {}
         assert_includes output.string, "Progress:"
 
+        output = StringIO.new
         enum = [1, 2].each.with_progressbar(output:, hide: true)
         assert_instance_of ::Enumerator, enum
+        assert_equal [1, 2], enum.to_a
+        assert_equal "", output.string
       end
     end
 
