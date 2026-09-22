@@ -39,14 +39,13 @@ module RunKit
           total: size
         ).merge(options)
 
-        return enum_for(__method__) if !block
+        return enum_for(__method__, options) if !block
+        return each(&block) if options[:hide]
 
-        bar = if !options[:hide]
-          ProgressBar.create(options)
-        end
+        bar = ProgressBar.create(options)
         RunKit::Term.with_hidden_cursor(options[:output]) do
           each do
-            bar&.increment
+            bar.increment
             yield(_1)
           end
         end
