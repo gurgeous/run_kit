@@ -167,9 +167,9 @@ module RunKit
       banner(str, color: :peach)
     end
 
-    def fatal(str)
+    def fatal(str, code: 1)
       banner(str, color: :red)
-      exit(1)
+      exit(code)
     end
 
     # Ask the user a question via stderr, then return true if they enter YES, yes, y, etc.

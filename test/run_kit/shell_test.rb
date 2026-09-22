@@ -12,6 +12,15 @@ module RunKit
       tmpdir.rmtree
     end
 
+    def test_fatal
+      [[{}, 1], [{code: 2}, 2]].each do |kwargs, status|
+        capture_io do
+          error = assert_raises(SystemExit) { Shell.fatal("failed", **kwargs) }
+          assert_equal status, error.status
+        end
+      end
+    end
+
     def test_file_read
       plain = tmp_path("plain.txt").tap { _1.write("hello\n") }
       gzip = tmp_path("gzip.txt.gz")

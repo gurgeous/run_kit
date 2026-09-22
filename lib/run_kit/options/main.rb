@@ -92,7 +92,7 @@ module RunKit
         if ex.is_a?(Error)
           warn "#{ctx.full_name}: #{ex.message}"
           warn "#{ctx.full_name}: try '#{ctx.full_name} --help' for more information"
-          return exit_fn(1, error: ex.message)
+          return exit_fn(2, error: ex.message)
         end
 
         # Inferred help on a bare invocation introduces the whole app.

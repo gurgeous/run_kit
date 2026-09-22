@@ -72,9 +72,9 @@ module RunKit
         [
           [nil, [], 0],
           ["false", [], nil],
-          ["invalid", [], 1],
-          [nil, %w[--no-force], 1],
-          [nil, %w[--other], 1],
+          ["invalid", [], 2],
+          [nil, %w[--no-force], 2],
+          [nil, %w[--other], 2],
         ].each do |env, argv, expected_status|
           env ? ENV["RUN_KIT_TEST_FORCE"] = env : ENV.delete("RUN_KIT_TEST_FORCE")
           %i[root explicit default].each do |mode|
@@ -87,12 +87,12 @@ module RunKit
             end
             output, stderr = capture_io { options = main.parse((mode == :explicit) ? ["build", *argv] : argv) }
             msg = [env, argv, mode].inspect
-            expected = (mode == :explicit && expected_status == 0) ? 1 : expected_status
+            expected = (mode == :explicit && expected_status == 0) ? 2 : expected_status
             assert_equal expected, status, msg
             if expected == 0
               assert_includes output, "Usage:", msg
               assert_equal "", stderr, msg
-            elsif expected == 1
+            elsif expected == 2
               assert_equal "", output, msg
               assert_includes stderr, "try '", msg
             else
@@ -147,7 +147,7 @@ module RunKit
             assert_equal command, options.command, msg
             assert_equal "", output, msg
           else
-            assert_equal 1, status, msg
+            assert_equal 2, status, msg
             assert_equal "", output, msg
             assert_includes stderr, "app sick: required argument '<url>' is missing", msg
           end
@@ -209,7 +209,7 @@ module RunKit
           end
           cli.parse(["--unknown"])
         end
-        assert_equal 1, status
+        assert_equal 2, status
         assert_includes stderr, "try 'run-kit --help'"
       end
 
@@ -262,7 +262,7 @@ module RunKit
             _1.root.exit = ->(value, *) { status = value }
           end.parse(["build"])
         end
-        assert_equal 1, status
+        assert_equal 2, status
         assert_equal "", output
         assert_includes stderr, "myapp build: required argument '<path>' is missing"
 
@@ -290,7 +290,7 @@ module RunKit
           main = build.call.tap { _1.root.exit = ->(value, *) { status = value } }
           main.parse(["bogus"])
         end
-        assert_equal 1, status
+        assert_equal 2, status
         assert_includes stderr, "unknown command 'bogus'"
 
         # subcommand errors use the subcommand's context
@@ -416,7 +416,7 @@ module RunKit
           _, stderr = capture_io { assert_nil main.parse(["build"]) }
           app = (failing == :root) ? "myapp" : "myapp build"
           assert_equal "#{app}: invalid combination\n#{app}: try '#{app} --help' for more information\n", stderr
-          assert_equal 1, status
+          assert_equal 2, status
           assert_equal "invalid combination", message
           assert_equal((failing == :root) ? [:root] : %i[root child], seen)
         end
@@ -495,7 +495,7 @@ module RunKit
         status = nil
         main.root.exit = ->(value) { status = value }
         _, stderr = capture_io { main.parse(%w[--unknown example.com]) }
-        assert_equal 1, status
+        assert_equal 2, status
         assert_includes stderr, "app fetch: unexpected argument '--unknown'"
       end
 
