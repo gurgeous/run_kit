@@ -145,6 +145,10 @@ Note: There has been some effort to get the Pathname helpers into Ruby itself, w
 
 ### Changelog
 
+#### 0.1.7 (Sep 2026)
+
+- don't emit hide/show cursor for progbar when `hide: true`
+
 #### 0.1.6 (Sep 2026)
 
 - default subcommands with `default: true`
